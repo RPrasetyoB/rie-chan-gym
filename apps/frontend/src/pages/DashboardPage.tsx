@@ -1,0 +1,301 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Flame, Calendar, Trophy, Target, TrendingUp, Clock, Dumbbell, MessageSquare, RefreshCw } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
+import { apiGet } from '@/lib/api'
+import { generateWorkoutPlan } from '@/lib/recommendationEngine'
+import { calculateAgeFromBirthday, loadOnboardingState } from '@/lib/onboardingStorage'
+import { getWorkoutStats, loadAuthSession } from '@/lib/appState'
+
+type WorkoutPlan = ReturnType<typeof generateWorkoutPlan> | null
+
+type DashboardSummary = {
+  streak: number
+  totalWorkouts: number
+  totalVolume: number
+}
+
+type DashboardResponse = {
+  summary: DashboardSummary
+  plan: WorkoutPlan
+  history: Array<{
+    id: string
+    planName: string
+    exercises: number
+    sets: number
+    completedAt?: string
+  }>
+}
+
+type ProfilePayload = {
+  birthday: string
+  name?: string
+  height: number
+  weight: number
+  gender: 'male' | 'female' | 'other'
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+  experienceLevel: 'beginner' | 'intermediate' | 'advanced'
+  injuries?: string
+  equipment?: string
+  workoutDays: number
+  sessionDuration: number
+  goals: string[]
+}
+
+export default function DashboardPage() {
+  const onboardingState = loadOnboardingState()
+  const authSession = loadAuthSession()
+  const localProfile = onboardingState.profile
+  const goals = onboardingState.goals ?? ['general_fitness']
+  const localAge = localProfile?.birthday ? calculateAgeFromBirthday(localProfile.birthday) : 25
+  const localWorkoutPlan = localProfile
+    ? generateWorkoutPlan({
+        ...localProfile,
+        age: localAge,
+        goals,
+      })
+    : null
+
+  const [remoteSummary, setRemoteSummary] = useState<DashboardSummary | null>(null)
+  const [remotePlan, setRemotePlan] = useState<WorkoutPlan>(null)
+  const [remoteHistory, setRemoteHistory] = useState<DashboardResponse['history']>([])
+  const [remoteProfile, setRemoteProfile] = useState<ProfilePayload | null>(null)
+  const [isSyncing, setIsSyncing] = useState(true)
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
+
+  const syncDashboard = async () => {
+    try {
+      const [summaryResponse, planResponse, historyResponse, profileResponse] = await Promise.all([
+        apiGet<{ summary: DashboardSummary }>('/progress/summary'),
+        apiGet<{ plan: WorkoutPlan }>('/workouts/plan/current'),
+        apiGet<{ sessions: DashboardResponse['history'] }>('/workouts/history'),
+        apiGet<{ profile: ProfilePayload | null }>('/profile'),
+      ])
+
+      setRemoteSummary(summaryResponse.summary)
+      setRemotePlan(planResponse.plan)
+      setRemoteHistory(historyResponse.sessions)
+      setRemoteProfile(profileResponse.profile)
+      setLastSyncedAt(new Date())
+    } catch {
+      setRemoteSummary(null)
+      setRemotePlan(null)
+      setRemoteHistory([])
+      setRemoteProfile(null)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  useEffect(() => {
+    syncDashboard()
+
+    const timer = window.setInterval(() => {
+      syncDashboard()
+    }, 20000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const resolvedProfile = remoteProfile ?? localProfile
+  const resolvedPlan = remotePlan ?? localWorkoutPlan
+  const workoutStats = getWorkoutStats()
+  const summary = remoteSummary ?? {
+    streak: workoutStats.currentStreak,
+    totalWorkouts: workoutStats.totalWorkouts || 42,
+    totalVolume: workoutStats.totalVolume || 125000,
+  }
+
+  const todayWorkout = {
+    name: resolvedPlan?.name ?? 'Upper Body Push',
+    exercises: resolvedPlan?.schedule[0]?.exercises.length ?? 6,
+    estimatedDuration: resolvedPlan?.estimatedDuration ?? 45,
+    focus: resolvedPlan?.schedule[0]?.focus ?? 'Full Body',
+    goalDrivers: resolvedPlan?.schedule[0]?.goalDrivers ?? goals.map((goal) => goal.replace(/_/g, ' ')),
+    completed: false,
+  }
+
+  const recentAchievements = useMemo(
+    () => [
+      {
+        id: 'streak',
+        title: `${summary.streak}-Day Streak`,
+        icon: '🔥',
+        unlockedAt: summary.streak > 0 ? 'Active now' : 'Get moving',
+      },
+      {
+        id: 'workouts',
+        title: `${summary.totalWorkouts} Logged Workouts`,
+        icon: '🏋️',
+        unlockedAt: remoteHistory[0]?.completedAt ? remoteHistory[0].completedAt.slice(0, 10) : 'This week',
+      },
+    ],
+    [remoteHistory, summary.streak, summary.totalWorkouts],
+  )
+
+  return (
+    <div className="p-4 max-w-lg mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold">
+            Good Morning{resolvedProfile?.name || authSession?.name ? `, ${resolvedProfile?.name || authSession?.name}` : ''}! 💪
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {resolvedPlan
+              ? `Today is your ${resolvedPlan.split.replace(/_/g, ' ')} session.`
+              : 'Ready to crush it today?'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <RieChanAvatar size={48} feature="dashboard" />
+          <Button variant="outline" size="icon" onClick={syncDashboard} aria-label="Refresh dashboard">
+            <RefreshCw className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+
+      {lastSyncedAt && (
+        <p className="text-xs text-muted-foreground mb-4">
+          Live sync {isSyncing ? 'updating' : `at ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+        </p>
+      )}
+
+      <Card className="mb-4 border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <Flame className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Current Streak</p>
+                <p className="font-display text-2xl font-bold text-primary">{summary.streak} days</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Best: 14 days</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            Today&apos;s Workout
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {todayWorkout.completed ? (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground">Workout completed! 🎉</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg">{todayWorkout.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Focus: {todayWorkout.focus}
+                </p>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                  <span className="flex items-center gap-1">
+                    <Dumbbell className="h-4 w-4" />
+                    {todayWorkout.exercises} exercises
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {todayWorkout.estimatedDuration} min
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Goals driving this day
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {todayWorkout.goalDrivers.map((goal) => (
+                      <span
+                        key={goal}
+                        className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                      >
+                        {goal}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <Link to="/workout">
+                <Button className="w-full" size="lg">
+                  Start Workout
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <p className="text-xs text-muted-foreground">Total Volume</p>
+            </div>
+            <p className="font-display text-xl font-bold">{(summary.totalVolume / 1000).toFixed(0)}k kg</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <p className="text-xs text-muted-foreground">Workouts</p>
+            </div>
+            <p className="font-display text-xl font-bold">{summary.totalWorkouts}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-primary" />
+            Recent Achievements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {recentAchievements.map((achievement) => (
+              <div
+                key={achievement.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50"
+              >
+                <span className="text-2xl">{achievement.icon}</span>
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{achievement.title}</p>
+                  <p className="text-xs text-muted-foreground">{achievement.unlockedAt}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link to="/calendar">
+          <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+            <Calendar className="h-5 w-5" />
+            <span className="text-sm">Calendar</span>
+          </Button>
+        </Link>
+        <Link to="/ai-coach">
+          <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+            <MessageSquare className="h-5 w-5" />
+            <span className="text-sm">Ask Rie-chan</span>
+          </Button>
+        </Link>
+      </div>
+    </div>
+  )
+}

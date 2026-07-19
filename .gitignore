@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+**/dist/
+**/build/
+**/coverage/
+
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Logs and local state
+*.log
+.DS_Store
+.vercel
+.turbo

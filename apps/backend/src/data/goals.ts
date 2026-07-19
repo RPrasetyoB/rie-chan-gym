@@ -1,0 +1,16 @@
+export const goalCatalog = [
+  { key: 'lose_weight', title: 'Lose Weight' },
+  { key: 'build_muscle', title: 'Build Muscle' },
+  { key: 'strength', title: 'Strength' },
+  { key: 'fat_loss', title: 'Fat Loss' },
+  { key: 'endurance', title: 'Endurance' },
+  { key: 'mobility', title: 'Mobility' },
+  { key: 'flexibility', title: 'Flexibility' },
+  { key: 'general_fitness', title: 'General Fitness' },
+  { key: 'better_posture', title: 'Better Posture' },
+  { key: 'improve_stamina', title: 'Improve Stamina (sex stamina)' },
+  { key: 'cardiovascular', title: 'Cardiovascular Fitness' },
+  { key: 'core_strength', title: 'Core Strength' },
+  { key: 'hip_mobility', title: 'Hip Mobility' },
+  { key: 'pelvic_floor', title: 'Pelvic Floor Strength' },
+]
