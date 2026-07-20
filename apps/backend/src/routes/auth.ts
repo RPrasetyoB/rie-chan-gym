@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
-import { hashPassword, signAccessToken, signRefreshToken, verifyAccessToken, verifyPassword } from '../lib/auth.js'
+import { hashPassword, signAccessToken, signRefreshToken, verifyAccessToken, verifyPassword, verifyRefreshToken } from '../lib/auth.js'
 import { AppError } from '../lib/http.js'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth, type AuthenticatedRequest } from '../middleware/requireAuth.js'
@@ -23,6 +23,21 @@ async function storeRefreshToken(userId: string, token: string) {
       expiresAt,
     },
   })
+}
+
+async function rotateRefreshToken(userId: string, oldToken: string, nextToken: string) {
+  await prisma.refreshToken.updateMany({
+    where: {
+      userId,
+      tokenHash: hashRefreshToken(oldToken),
+      revokedAt: null,
+    },
+    data: {
+      revokedAt: new Date(),
+    },
+  })
+
+  await storeRefreshToken(userId, nextToken)
 }
 
 const registerSchema = z.object({
@@ -100,6 +115,59 @@ authRouter.post('/login', async (req, res, next) => {
       user: { id: user.id, email: user.email, name: user.name },
       accessToken,
       refreshToken,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+authRouter.post('/refresh', async (req, res, next) => {
+  try {
+    const token = z.string().min(1).safeParse(req.body?.refreshToken)
+    if (!token.success) {
+      throw new AppError(401, 'Missing refresh token')
+    }
+
+    const decoded = verifyRefreshToken(token.data)
+    const storedToken = await prisma.refreshToken.findFirst({
+      where: {
+        userId: decoded.sub,
+        tokenHash: hashRefreshToken(token.data),
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    })
+
+    if (!storedToken) {
+      throw new AppError(401, 'Invalid refresh token')
+    }
+
+    const accessToken = signAccessToken({
+      sub: storedToken.user.id,
+      email: storedToken.user.email,
+      name: storedToken.user.name,
+    })
+    const refreshToken = signRefreshToken({
+      sub: storedToken.user.id,
+      email: storedToken.user.email,
+      name: storedToken.user.name,
+    })
+
+    await rotateRefreshToken(storedToken.user.id, token.data, refreshToken)
+
+    res.json({
+      accessToken,
+      refreshToken,
+      user: storedToken.user,
     })
   } catch (error) {
     next(error)

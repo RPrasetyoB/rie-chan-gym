@@ -9,6 +9,7 @@ import { notFound } from './middleware/notFound.js'
 
 export function createApp() {
   const app = express()
+  app.set('trust proxy', env.NODE_ENV === 'production')
 
   app.use(helmet())
   app.use(

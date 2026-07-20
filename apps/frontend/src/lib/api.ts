@@ -11,6 +11,7 @@ export type AuthTokens = {
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 const AUTH_TOKEN_KEY = 'rie-chan-auth-tokens'
+let refreshPromise: Promise<AuthTokens | null> | null = null
 
 function isClient() {
   return typeof window !== 'undefined'
@@ -62,10 +63,50 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return payload as T
 }
 
+async function refreshAuthTokens() {
+  if (refreshPromise) {
+    return refreshPromise
+  }
+
+  refreshPromise = (async () => {
+    const tokens = loadAuthTokens()
+    if (!tokens?.refreshToken) {
+      return null
+    }
+
+    try {
+      const response = await fetch(buildUrl('/auth/refresh'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      })
+
+      if (!response.ok) {
+        clearAuthTokens()
+        return null
+      }
+
+      const payload = (await response.json()) as AuthTokens
+      saveAuthTokens(payload)
+      return payload
+    } catch {
+      clearAuthTokens()
+      return null
+    } finally {
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
-  options: { auth?: boolean } = {},
+  options: { auth?: boolean; retryOnAuth?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers)
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
@@ -84,6 +125,30 @@ export async function apiRequest<T>(
     headers,
     credentials: 'include',
   })
+
+  if (response.status === 401 && options.auth !== false && options.retryOnAuth !== false) {
+    const refreshed = await refreshAuthTokens()
+    if (refreshed?.accessToken) {
+      const retryHeaders = new Headers(init.headers)
+      const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+
+      if (!isFormData && init.body && !retryHeaders.has('Content-Type')) {
+        retryHeaders.set('Content-Type', 'application/json')
+      }
+
+      retryHeaders.set('Authorization', `Bearer ${refreshed.accessToken}`)
+
+      const retryResponse = await fetch(buildUrl(path), {
+        ...init,
+        headers: retryHeaders,
+        credentials: 'include',
+      })
+
+      if (retryResponse.ok) {
+        return parseResponse<T>(retryResponse)
+      }
+    }
+  }
 
   return parseResponse<T>(response)
 }
@@ -113,4 +178,3 @@ export function apiPut<T>(path: string, body?: unknown, auth = true) {
     { auth },
   )
 }
-

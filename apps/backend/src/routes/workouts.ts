@@ -47,8 +47,13 @@ workoutsRouter.post('/sessions', async (req: AuthenticatedRequest, res, next) =>
 
 workoutsRouter.post('/sessions/:id/logs', async (req: AuthenticatedRequest, res, next) => {
   try {
+    const exerciseId = String(req.body?.exerciseId ?? '').trim()
+    if (!exerciseId) {
+      return res.status(400).json({ error: 'Bad Request', message: 'exerciseId is required' })
+    }
+
     const session = await appendWorkoutSessionLog(req.user!.id, String(req.params.id), {
-      exerciseId: String(req.body?.exerciseId ?? ''),
+      exerciseId,
       exerciseName: String(req.body?.exerciseName ?? 'Exercise'),
       setIndex: Number(req.body?.setIndex ?? 0),
       exerciseIndex: Number(req.body?.exerciseIndex ?? 0),

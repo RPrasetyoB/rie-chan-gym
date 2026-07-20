@@ -17,6 +17,6 @@
     "build:backend": "cd apps/backend && npm run build"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^10.0.3"
   }
 }

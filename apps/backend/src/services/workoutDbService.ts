@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js'
+import { exerciseCatalog } from '../data/exercises.js'
 import type { WorkoutSetLog } from '../types/domain.js'
 import { calculateAgeFromBirthday, generateWorkoutPlan, type ProfileInput } from './workoutPlanService.js'
 import { getProfileForUser, type PersistedProfile } from './profileDbService.js'
@@ -33,6 +34,43 @@ function decodeMetadata(notes?: string | null): SessionMetadata {
   } catch {
     return {}
   }
+}
+
+function normalizeKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function findExerciseSeed(exerciseId: string, exerciseName?: string) {
+  const byId = exerciseCatalog.find((exercise) => exercise.id === exerciseId)
+  if (byId) return byId
+
+  if (exerciseName) {
+    const normalizedName = normalizeKey(exerciseName)
+    return exerciseCatalog.find((exercise) => normalizeKey(exercise.name) === normalizedName)
+  }
+
+  return undefined
+}
+
+async function ensureExerciseRecord(exerciseId: string, exerciseName?: string) {
+  const seed = findExerciseSeed(exerciseId, exerciseName)
+
+  return prisma.exercise.upsert({
+    where: { id: exerciseId },
+    update: seed
+      ? {
+          name: seed.name,
+          difficulty: seed.difficulty,
+        }
+      : {
+          name: exerciseName ?? 'Exercise',
+        },
+    create: {
+      id: exerciseId,
+      name: seed?.name ?? exerciseName ?? 'Exercise',
+      difficulty: seed?.difficulty ?? 'beginner',
+    },
+  })
 }
 
 function serializeSession(session: {
@@ -142,10 +180,16 @@ export async function appendWorkoutSessionLog(
   sessionId: string,
   log: WorkoutSetLog,
 ) {
+  if (!log.exerciseId.trim()) {
+    throw new Error('exerciseId is required')
+  }
+
   const session = await loadSession(sessionId, userId)
   if (!session) {
     return null
   }
+
+  await ensureExerciseRecord(log.exerciseId, log.exerciseName)
 
   let sessionExercise = await prisma.workoutSessionExercise.findFirst({
     where: {

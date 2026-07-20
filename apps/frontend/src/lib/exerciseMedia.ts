@@ -18,15 +18,54 @@ const EXERCISE_MEDIA: ExerciseMediaEntry[] = [
   { id: 'deadlift', name: 'Deadlift', gifUrl: '/assets/exercises/deadlift.gif', aliases: ['barbell deadlift'] },
   { id: 'pull_up', name: 'Pull Up', gifUrl: '/assets/exercises/pull_up.gif', aliases: ['pull up (neutral grip)', 'archer pull up'] },
   { id: 'lat_pulldown', name: 'Lat Pulldown', gifUrl: '/assets/exercises/lat_pulldown.gif', aliases: ['cable lat pulldown full range of motion'] },
+  { id: '0025', name: 'Barbell Bench Press', gifUrl: '/assets/exercises/0025.gif', aliases: ['barbell bench press'] },
+  { id: '0033', name: 'Barbell Decline Bench Press', gifUrl: '/assets/exercises/0033.gif', aliases: ['barbell decline bench press'] },
+  { id: '0009', name: 'Assisted Chest Dip (Kneeling)', gifUrl: '/assets/exercises/0009.gif', aliases: ['assisted chest dip kneeling'] },
+  { id: '2364', name: 'Assisted Wide-Grip Chest Dip (Kneeling)', gifUrl: '/assets/exercises/2364.gif', aliases: ['assisted wide grip chest dip kneeling'] },
+  { id: '1254', name: 'Band Bench Press', gifUrl: '/assets/exercises/1254.gif', aliases: ['band bench press'] },
+  { id: '0007', name: 'Alternate Lateral Pulldown', gifUrl: '/assets/exercises/0007.gif', aliases: ['alternate lateral pulldown'] },
+  { id: '3293', name: 'Archer Pull Up', gifUrl: '/assets/exercises/3293.gif', aliases: ['archer pull up'] },
+  { id: '0015', name: 'Assisted Parallel Close Grip Pull-Up', gifUrl: '/assets/exercises/0015.gif', aliases: ['assisted parallel close grip pull up'] },
+  { id: '0017', name: 'Assisted Pull-Up', gifUrl: '/assets/exercises/0017.gif', aliases: ['assisted pull up'] },
+  { id: '1431', name: 'Assisted Standing Chin-Up', gifUrl: '/assets/exercises/1431.gif', aliases: ['assisted standing chin up'] },
   { id: 'overhead_press', name: 'Overhead Press', gifUrl: '/assets/exercises/overhead_press.gif', aliases: ['dumbbell standing overhead press', 'dumbbell seated shoulder press'] },
   { id: 'lateral_raise', name: 'Lateral Raise', gifUrl: '/assets/exercises/lateral_raise.gif', aliases: ['dumbbell lateral raise'] },
+  { id: '0977', name: 'Band Front Lateral Raise', gifUrl: '/assets/exercises/0977.gif', aliases: ['band front lateral raise'] },
+  { id: '0993', name: 'Band Reverse Fly', gifUrl: '/assets/exercises/0993.gif', aliases: ['band reverse fly'] },
+  { id: '0997', name: 'Band Shoulder Press', gifUrl: '/assets/exercises/0997.gif', aliases: ['band shoulder press'] },
+  { id: '1022', name: 'Band Standing Rear Delt Row', gifUrl: '/assets/exercises/1022.gif', aliases: ['band standing rear delt row'] },
+  { id: '0075', name: 'Barbell Rear Delt Raise', gifUrl: '/assets/exercises/0075.gif', aliases: ['barbell rear delt raise'] },
   { id: 'bicep_curl', name: 'Bicep Curl', gifUrl: '/assets/exercises/bicep_curl.gif', aliases: ['dumbbell biceps curl', 'barbell curl'] },
   { id: 'tricep_pushdown', name: 'Tricep Pushdown', gifUrl: '/assets/exercises/tricep_pushdown.gif', aliases: ['cable triceps pushdown (v-bar)', 'cable pushdown'] },
+  { id: '0023', name: 'Barbell Alternate Biceps Curl', gifUrl: '/assets/exercises/0023.gif', aliases: ['barbell alternate biceps curl'] },
+  { id: '0031', name: 'Barbell Curl', gifUrl: '/assets/exercises/0031.gif', aliases: ['barbell curl'] },
+  { id: '0038', name: 'Barbell Drag Curl', gifUrl: '/assets/exercises/0038.gif', aliases: ['barbell drag curl'] },
+  { id: '0059', name: 'Barbell Lying Preacher Curl', gifUrl: '/assets/exercises/0059.gif', aliases: ['barbell lying preacher curl'] },
+  { id: '0070', name: 'Barbell Preacher Curl', gifUrl: '/assets/exercises/0070.gif', aliases: ['barbell preacher curl'] },
   { id: 'squat', name: 'Squat', gifUrl: '/assets/exercises/squat.gif', aliases: ['barbell full squat', 'barbell front squat'] },
   { id: 'leg_press', name: 'Leg Press', gifUrl: '/assets/exercises/leg_press.gif', aliases: ['sled 45° leg press (side pov)', 'sled 45 degrees one leg press'] },
   { id: 'lunge', name: 'Lunge', gifUrl: '/assets/exercises/lunge.gif', aliases: ['dumbbell lunge', 'barbell lunge'] },
+  { id: '0024', name: 'Barbell Bench Front Squat', gifUrl: '/assets/exercises/0024.gif', aliases: ['barbell bench front squat'] },
+  { id: '0026', name: 'Barbell Bench Squat', gifUrl: '/assets/exercises/0026.gif', aliases: ['barbell bench squat'] },
+  { id: '0044', name: 'Barbell Good Morning', gifUrl: '/assets/exercises/0044.gif', aliases: ['barbell good morning'] },
+  { id: '0116', name: 'Barbell Straight Leg Deadlift', gifUrl: '/assets/exercises/0116.gif', aliases: ['barbell straight leg deadlift'] },
+  { id: '1473', name: 'Backward Jump', gifUrl: '/assets/exercises/1473.gif', aliases: ['backward jump'] },
   { id: 'plank', name: 'Plank', gifUrl: '/assets/exercises/plank.gif', aliases: ['weighted front plank', 'front plank with twist'] },
   { id: 'crunch', name: 'Crunch', gifUrl: '/assets/exercises/crunch.gif', aliases: ['cable seated crunch', 'reverse crunch'] },
+  { id: '0001', name: '3/4 Sit Up', gifUrl: '/assets/exercises/0001.gif', aliases: ['3 4 sit up', '3/4 sit up', '3/4 sit up', '3 4 sit-up'] },
+  {
+    id: '0002',
+    name: '45 Degree Side Bend',
+    gifUrl: '/assets/exercises/0002.gif',
+    aliases: ['45 degree side bend', '45 degree side bends', '45 side bend', '45 side bends', '45° side bend'],
+  },
+  { id: '0006', name: 'Alternate Heel Touchers', gifUrl: '/assets/exercises/0006.gif', aliases: ['alternate heel touchers'] },
+  { id: '0011', name: 'Assisted Hanging Knee Raise', gifUrl: '/assets/exercises/0011.gif', aliases: ['assisted hanging knee raise'] },
+  { id: '0014', name: 'Assisted Motion Russian Twist', gifUrl: '/assets/exercises/0014.gif', aliases: ['assisted motion russian twist'] },
+  { id: '0971', name: 'Band Assisted Wheel Rollerout', gifUrl: '/assets/exercises/0971.gif', aliases: ['band assisted wheel rollerout'] },
+  { id: '0979', name: 'Band Horizontal Pallof Press', gifUrl: '/assets/exercises/0979.gif', aliases: ['band horizontal pallof press'] },
+  { id: '0981', name: 'Band Jack Knife Sit-Up', gifUrl: '/assets/exercises/0981.gif', aliases: ['band jack knife sit up'] },
+  { id: '0985', name: 'Band Kneeling Twisting Crunch', gifUrl: '/assets/exercises/0985.gif', aliases: ['band kneeling twisting crunch'] },
   { id: 'barbell_glute_bridge', name: 'Barbell Glute Bridge', gifUrl: '/assets/exercises/1409.gif', aliases: ['barbell glute bridge'] },
   { id: 'glute_bridge_march', name: 'Glute Bridge March', gifUrl: '/assets/exercises/3561.gif', aliases: ['glute bridge march'] },
   { id: 'low_glute_bridge_on_floor', name: 'Low Glute Bridge On Floor', gifUrl: '/assets/exercises/3013.gif', aliases: ['low glute bridge on floor'] },
@@ -106,7 +145,11 @@ for (const entry of EXERCISE_MEDIA) {
 }
 
 function normalizeKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return value
+    .toLowerCase()
+    .replace(/°|Â°/g, ' degree ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 export function getExerciseMedia(exerciseId?: string, exerciseName?: string): ExerciseMedia | null {

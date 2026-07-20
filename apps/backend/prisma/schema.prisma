@@ -303,6 +303,16 @@ model AiUsage {
   @@id([userId, feature, date])
 }
 
+model AiChatUsageByIp {
+  ipHash    String
+  dateKey   String
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([ipHash, dateKey])
+}
+
 model RefreshToken {
   id         String   @id @default(cuid())
   userId     String

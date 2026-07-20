@@ -8,6 +8,7 @@ import { apiGet } from '@/lib/api'
 import { generateWorkoutPlan } from '@/lib/recommendationEngine'
 import { calculateAgeFromBirthday, loadOnboardingState } from '@/lib/onboardingStorage'
 import { getWorkoutStats, loadAuthSession } from '@/lib/appState'
+import { getBMIStatus, getFitWeightTarget } from '@/lib/utils'
 
 type WorkoutPlan = ReturnType<typeof generateWorkoutPlan> | null
 
@@ -102,6 +103,12 @@ export default function DashboardPage() {
   const resolvedProfile = remoteProfile ?? localProfile
   const resolvedPlan = remotePlan ?? localWorkoutPlan
   const workoutStats = getWorkoutStats()
+  const bmiStatus = resolvedProfile
+    ? getBMIStatus(resolvedProfile.weight, resolvedProfile.height)
+    : null
+  const fitWeightTarget = resolvedProfile
+    ? getFitWeightTarget(resolvedProfile.weight, resolvedProfile.height)
+    : null
   const summary = remoteSummary ?? {
     streak: workoutStats.currentStreak,
     totalWorkouts: workoutStats.totalWorkouts || 42,
@@ -147,6 +154,13 @@ export default function DashboardPage() {
               ? `Today is your ${resolvedPlan.split.replace(/_/g, ' ')} session.`
               : 'Ready to crush it today?'}
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isSyncing
+              ? 'Syncing live stats...'
+              : lastSyncedAt
+                ? `Last synced ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : 'Working from local data'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <RieChanAvatar size={48} feature="dashboard" />
@@ -155,12 +169,6 @@ export default function DashboardPage() {
           </Button>
         </div>
       </div>
-
-      {lastSyncedAt && (
-        <p className="text-xs text-muted-foreground mb-4">
-          Live sync {isSyncing ? 'updating' : `at ${lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-        </p>
-      )}
 
       <Card className="mb-4 border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
         <CardContent className="p-4">
@@ -227,7 +235,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Link to="/workout">
-                <Button className="w-full" size="lg">
+                <Button className="w-full mt-4" size="lg">
                   Start Workout
                 </Button>
               </Link>
@@ -244,6 +252,9 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">Total Volume</p>
             </div>
             <p className="font-display text-xl font-bold">{(summary.totalVolume / 1000).toFixed(0)}k kg</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Total load = sets x reps x weight across your logged workouts.
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -256,6 +267,33 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {bmiStatus && (
+        <Card className="mb-4 border border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Body status</p>
+                <p className="font-display text-lg font-bold">{bmiStatus.label}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-display text-xl font-bold">{bmiStatus.bmi.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">BMI</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-3">{bmiStatus.recommendation}</p>
+            {fitWeightTarget && fitWeightTarget.status !== 'normal' && fitWeightTarget.rangeKg && (
+              <div className="mt-4 rounded-lg border border-border bg-background/70 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fit weight target</p>
+                <p className="font-display text-lg font-bold text-primary mt-1">
+                  {fitWeightTarget.rangeKg[0].toFixed(1)} - {fitWeightTarget.rangeKg[1].toFixed(1)} kg
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">{fitWeightTarget.recommendation}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-4">
         <CardHeader>

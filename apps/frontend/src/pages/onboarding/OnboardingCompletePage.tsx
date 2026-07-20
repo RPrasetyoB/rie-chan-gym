@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { useToast } from '@/hooks/use-toast'
 import { apiPut } from '@/lib/api'
-import { calculateBMI, calculateBMR, calculateDailyCalories } from '@/lib/utils'
+import { calculateBMI, calculateBMR, calculateDailyCalories, getBMIStatus, getFitWeightTarget } from '@/lib/utils'
 import { formatGoalLabel, generateWorkoutPlan } from '@/lib/recommendationEngine'
 import {
   calculateAgeFromBirthday,
@@ -28,7 +28,9 @@ export default function OnboardingCompletePage() {
     activityLevel: profile?.activityLevel ?? ('moderate' as const),
   }
 
-  const bmi = calculateBMI(resolvedProfile.weight, resolvedProfile.height / 100)
+  const bmi = calculateBMI(resolvedProfile.weight, resolvedProfile.height)
+  const bmiStatus = getBMIStatus(resolvedProfile.weight, resolvedProfile.height)
+  const fitWeightTarget = getFitWeightTarget(resolvedProfile.weight, resolvedProfile.height)
   const bmr = calculateBMR(
     resolvedProfile.weight,
     resolvedProfile.height,
@@ -101,7 +103,10 @@ export default function OnboardingCompletePage() {
             <div className="text-left space-y-3">
               <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
                 <span className="text-muted-foreground">BMI</span>
-                <span className="font-display font-bold">{bmi.toFixed(1)}</span>
+                <div className="text-right">
+                  <span className="font-display font-bold block">{bmi.toFixed(1)}</span>
+                  <span className="text-xs text-muted-foreground">{bmiStatus.label}</span>
+                </div>
               </div>
               <div className="flex justify-between items-center p-3 bg-secondary/50 rounded-lg">
                 <span className="text-muted-foreground">BMR</span>
@@ -120,6 +125,16 @@ export default function OnboardingCompletePage() {
                   ? `I built a ${workoutPlan.split.replace(/_/g, ' ')} plan with ${workoutPlan.schedule.length} training days. Let&apos;s begin with a steady, sustainable start.`
                   : 'Based on your profile, I will build a workout plan that fits your goals and schedule.'}
               </p>
+              <p className="text-sm text-muted-foreground mt-2">{bmiStatus.recommendation}</p>
+              {fitWeightTarget.status !== 'normal' && fitWeightTarget.rangeKg && (
+                <div className="mt-3 rounded-lg border border-border bg-background/70 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Fit weight target</p>
+                  <p className="font-display text-lg font-bold text-primary mt-1">
+                    {fitWeightTarget.rangeKg[0].toFixed(1)} - {fitWeightTarget.rangeKg[1].toFixed(1)} kg
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">{fitWeightTarget.recommendation}</p>
+                </div>
+              )}
             </div>
 
             {workoutPlan && (

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Play, SkipForward, Check, X, BarChart3, TimerReset } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Play, SkipForward, Check, X, BarChart3, TimerReset, Maximize2, Minimize2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { CameraRepCounter } from '@/components/workout/CameraRepCounter'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet, apiPost } from '@/lib/api'
 import { getExerciseMedia } from '@/lib/exerciseMedia'
+import { getCameraTrackingMode } from '@/lib/poseCounter'
 import { getCurrentWorkoutPlan, saveWorkoutCompletion } from '@/lib/appState'
 
 interface WorkoutSet {
@@ -124,8 +126,11 @@ export default function WorkoutPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [currentWeight, setCurrentWeight] = useState(0)
   const [currentReps, setCurrentReps] = useState(0)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [isFullscreenMode, setIsFullscreenMode] = useState(false)
   const [statusMessage, setStatusMessage] = useState('Ready when you are.')
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
+  const fullscreenShellRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -195,6 +200,10 @@ export default function WorkoutPage() {
   const activeWorkout = sessionWorkout ?? workout
   const currentExercise = activeWorkout[currentExerciseIndex]
   const currentSet = currentExercise?.sets[currentSetIndex]
+  const cameraTrackingMode = useMemo(
+    () => getCameraTrackingMode(currentExercise?.id, currentExercise?.name),
+    [currentExercise?.id, currentExercise?.name],
+  )
   const currentExerciseMedia = getExerciseMedia(currentExercise?.id, currentExercise?.name)
   const currentGoalDrivers = currentPlanDay?.goalDrivers ?? []
   const completedSets = useMemo(
@@ -215,6 +224,29 @@ export default function WorkoutPage() {
     [activeWorkout],
   )
   const workoutProgress = totalSets === 0 ? 0 : Math.round((completedSets / totalSets) * 100)
+
+  useEffect(() => {
+    if (!currentSet) return
+    if (isCameraActive && cameraTrackingMode) {
+      setCurrentReps(0)
+    }
+  }, [cameraTrackingMode, currentExerciseIndex, currentSetIndex, currentSet, isCameraActive])
+
+  useEffect(() => {
+    if (!currentSet) return
+    if (!isCameraActive) {
+      setCurrentReps(currentSet.reps)
+    }
+  }, [currentSet, isCameraActive])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreenMode(Boolean(document.fullscreenElement))
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   const startWorkout = async () => {
     const startedAt = new Date().toISOString()
@@ -318,6 +350,31 @@ export default function WorkoutPage() {
 
     setStatusMessage('Set skipped. Keep your pace and protect the form.')
     moveToNextSet()
+  }
+
+  const enterFullscreen = async () => {
+    setIsFullscreenMode(true)
+
+    const shell = fullscreenShellRef.current
+    if (shell?.requestFullscreen) {
+      try {
+        await shell.requestFullscreen()
+      } catch {
+        setIsFullscreenMode(true)
+      }
+    }
+  }
+
+  const exitFullscreen = async () => {
+    setIsFullscreenMode(false)
+
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try {
+        await document.exitFullscreen()
+      } catch {
+        setIsFullscreenMode(false)
+      }
+    }
   }
 
   if (isPlanLoading && !plan) {
@@ -430,33 +487,104 @@ export default function WorkoutPage() {
     )
   }
 
-  if (isResting) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-4 bg-background">
-        <RieChanAvatar size={96} expression="rest" className="mb-4 animate-pulse-glow" />
+  const restOverlay = isResting ? (
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-xl">
+        <RieChanAvatar size={96} expression="rest" className="mx-auto mb-4 animate-pulse-glow" />
         <h2 className="font-display text-2xl font-bold mb-2">Rest Time</h2>
         <p className="text-5xl font-display font-bold text-primary mb-4">
           {formatTime(restTimeRemaining)}
         </p>
-        <p className="text-sm text-muted-foreground mb-8 text-center max-w-sm">
-          {statusMessage}
-        </p>
-        <div className="flex gap-4">
-          <Button variant="outline" size="lg" onClick={() => setRestTimeRemaining(0)}>
+        <p className="text-sm text-muted-foreground mb-8">{statusMessage}</p>
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" size="lg" onClick={() => setRestTimeRemaining(0)}>
             <TimerReset className="h-5 w-5 mr-2" />
             Skip Rest
           </Button>
-          <Button size="lg" onClick={() => setIsResting(false)}>
+          <Button className="flex-1" size="lg" onClick={() => setIsResting(false)}>
             <Play className="h-5 w-5 mr-2" />
             Continue
           </Button>
         </div>
       </div>
-    )
-  }
+    </div>
+  ) : null
 
   return (
-    <div className="h-full flex flex-col p-4 max-w-lg mx-auto">
+    <div ref={fullscreenShellRef} className="relative h-full flex flex-col p-4 w-full max-w-6xl mx-auto">
+      {isFullscreenMode && (
+        <div className="fixed inset-0 z-50 bg-black text-white">
+          <div className="relative h-full w-full overflow-hidden">
+            <div className="absolute inset-0">
+              <CameraRepCounter
+                exerciseId={currentExercise?.id}
+                exerciseName={currentExercise?.name}
+                isWorkoutActive={isWorkoutActive}
+                isTrackingEnabled={!isResting}
+                showControls={false}
+                className="h-full w-full rounded-none bg-black"
+                onRepCountChange={setCurrentReps}
+                onCameraActiveChange={setIsCameraActive}
+              />
+            </div>
+
+            <div className="absolute left-4 top-4 z-20 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-md">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Set</p>
+                <p className="font-display text-2xl font-bold leading-none">
+                  {currentSetIndex + 1}/{currentExercise?.sets.length ?? 0}
+                </p>
+              </div>
+              <div className="h-10 w-px bg-white/10" />
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Reps</p>
+                <p className="font-display text-2xl font-bold leading-none text-primary">{currentReps}</p>
+              </div>
+              <div className="h-10 w-px bg-white/10" />
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Target</p>
+                <p className="font-display text-2xl font-bold leading-none">{currentSet?.reps ?? 0}</p>
+              </div>
+            </div>
+
+            {currentExerciseMedia && (
+              <div className="absolute bottom-4 left-4 z-20 w-[min(34vw,260px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md">
+                <div className="border-b border-white/10 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Exercise</p>
+                  <p className="font-semibold leading-tight">{currentExercise?.name}</p>
+                </div>
+                <img
+                  src={currentExerciseMedia.gifUrl}
+                  alt={currentExerciseMedia.alt}
+                  className="h-40 w-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="absolute bottom-4 right-4 z-20 flex items-end gap-3">
+              <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-right backdrop-blur-md">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Rie-chibi says</p>
+                <p className="max-w-[14rem] text-sm text-white/85">{statusMessage}</p>
+              </div>
+              <RieChanAvatar size={88} expression="cheer" className="animate-pulse-glow" />
+            </div>
+
+            <div className="absolute right-4 top-4 z-20 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 bg-black/50 text-white hover:bg-black/70 hover:text-white"
+                onClick={exitFullscreen}
+              >
+                <Minimize2 className="h-4 w-4 mr-2" />
+                Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restOverlay}
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="icon" onClick={() => setIsWorkoutActive(false)}>
           <X className="h-6 w-6" />
@@ -469,124 +597,157 @@ export default function WorkoutPage() {
             Set {currentSetIndex + 1} of {currentExercise?.sets.length ?? 0}
           </p>
         </div>
-        <div className="w-10" />
-      </div>
-
-      <Card className="mb-4 border border-primary/20 bg-primary/5 overflow-hidden">
-        {currentExerciseMedia && (
-          <div className="aspect-video bg-secondary/40 border-b border-border overflow-hidden">
-            <img
-              src={currentExerciseMedia.gifUrl}
-              alt={currentExerciseMedia.alt}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Live Session</p>
-              <p className="font-semibold">{plan?.name ?? 'Manual Workout'}</p>
-              {currentPlanDay?.focus && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Focus: {currentPlanDay.focus}
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Elapsed</p>
-              <p className="font-display font-bold text-primary">{formatTime(elapsedSeconds)}</p>
-            </div>
-          </div>
-
-          {currentGoalDrivers.length > 0 && (
-            <div className="mb-4 rounded-lg border border-primary/15 bg-primary/5 p-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                Goals driving this day
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {currentGoalDrivers.map((goal) => (
-                  <span
-                    key={goal}
-                    className="rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary"
-                  >
-                    {goal}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="h-2 rounded-full bg-secondary overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${workoutProgress}%` }}
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <div className="rounded-lg bg-background p-3 text-center border border-border">
-              <p className="text-xs text-muted-foreground">Done</p>
-              <p className="font-display font-bold text-primary">{completedSets}</p>
-            </div>
-            <div className="rounded-lg bg-background p-3 text-center border border-border">
-              <p className="text-xs text-muted-foreground">Volume</p>
-              <p className="font-display font-bold text-primary">{currentVolume}</p>
-            </div>
-            <div className="rounded-lg bg-background p-3 text-center border border-border">
-              <p className="text-xs text-muted-foreground">Session</p>
-              <p className="font-display font-bold text-primary">{sessionStartedAt ? 'Live' : 'Ready'}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 mb-4">
-        <RieChanAvatar
-          size={72}
-          expression={isResting ? 'rest' : completedSets > 0 ? 'cheer' : 'point'}
-        />
-        <div className="space-y-1">
-          <p className="font-semibold">Rie-chan says</p>
-          <p className="text-sm text-muted-foreground">{statusMessage}</p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={isFullscreenMode ? exitFullscreen : enterFullscreen}>
+            {isFullscreenMode ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+            {isFullscreenMode ? 'Exit Fullscreen' : 'Fullscreen'}
+          </Button>
+          <div className="w-2" />
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <h1 className="font-display text-3xl font-bold mb-2 text-center">{currentExercise?.name}</h1>
-        <p className="text-muted-foreground mb-2 text-center">
-          Target: {currentSet?.reps} reps @ {currentSet?.weight} kg
-        </p>
-        {currentExercise?.notes && (
-          <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-            {currentExercise.notes}
-          </p>
-        )}
+      <div className="flex-1 flex flex-col gap-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] items-start">
+          <Card className="overflow-hidden border border-primary/20 bg-primary/5">
+            <CardHeader className="border-b border-border/70 bg-background/40 pb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Exercise</p>
+                  <h1 className="font-display text-2xl font-bold">{currentExercise?.name}</h1>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {plan?.name ?? 'Manual Workout'}
+                    {currentPlanDay?.focus ? ` - ${currentPlanDay.focus}` : ''}
+                  </p>
+                </div>
+                {cameraTrackingMode ? (
+                  <span className="rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary">
+                    {cameraTrackingMode.replace(/_/g, ' ')}
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                    No camera mode
+                  </span>
+                )}
+              </div>
+            </CardHeader>
 
-        <Card className="w-full mb-6">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-muted-foreground block mb-2">Weight (kg)</label>
-                <input
-                  type="number"
-                  value={currentWeight}
-                  onChange={(event) => setCurrentWeight(Number(event.target.value))}
-                  className="w-full h-12 rounded-lg border-2 border-input bg-background px-4 text-center text-2xl font-display font-bold"
-                />
+            <CardContent className="p-0">
+              {currentExerciseMedia && (
+                <div className="aspect-video bg-secondary/40 overflow-hidden border-b border-border/70">
+                  <img
+                    src={currentExerciseMedia.gifUrl}
+                    alt={currentExerciseMedia.alt}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* <div className="px-4 pt-2 pb-4 space-y-2"> */}
+                <div className="rounded-lg bg-card/60 p-1.5">
+                  <CameraRepCounter
+                    exerciseId={currentExercise?.id}
+                    exerciseName={currentExercise?.name}
+                    isWorkoutActive={isWorkoutActive}
+                    isTrackingEnabled={!isResting}
+                    onRepCountChange={setCurrentReps}
+                    onCameraActiveChange={setIsCameraActive}
+                  />
+                </div>
+              {/* </div> */}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border bg-card">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Current set</p>
+                  <p className="font-display text-3xl font-bold text-primary">
+                    {currentSetIndex + 1}/{currentExercise?.sets.length ?? 0}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Session</p>
+                  <p className="font-medium">{sessionStartedAt ? 'Live' : 'Ready'}</p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm text-muted-foreground block mb-2">Reps</label>
-                <input
-                  type="number"
-                  value={currentReps}
-                  onChange={(event) => setCurrentReps(Number(event.target.value))}
-                  className="w-full h-12 rounded-lg border-2 border-input bg-background px-4 text-center text-2xl font-display font-bold"
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Target reps</p>
+                  <p className="font-display text-2xl font-bold text-primary">{currentSet?.reps ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Target weight</p>
+                  <p className="font-display text-2xl font-bold text-primary">{currentSet?.weight ?? 0}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Your reps</p>
+                  <p className="font-display text-2xl font-bold text-foreground">{currentReps}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Your weight</p>
+                  <p className="font-display text-2xl font-bold text-foreground">{currentWeight}</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Progress</p>
+                  <p className="font-medium">{workoutProgress}%</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Elapsed</p>
+                  <p className="font-medium">{formatTime(elapsedSeconds)}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Done</p>
+                  <p className="font-medium">{completedSets}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/50 p-3">
+                  <p className="text-xs text-muted-foreground">Volume</p>
+                  <p className="font-medium">{currentVolume}</p>
+                </div>
+              </div>
+
+              {currentExercise?.notes && (
+                <div className="rounded-lg border border-border bg-background/80 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Form note</p>
+                  <p className="text-sm text-muted-foreground">{currentExercise.notes}</p>
+                </div>
+              )}
+
+              {currentGoalDrivers.length > 0 && (
+                <div className="rounded-lg border border-primary/15 bg-primary/5 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                    Goals driving this day
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {currentGoalDrivers.map((goal) => (
+                      <span
+                        key={goal}
+                        className="rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary"
+                      >
+                        {goal}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
+          <RieChanAvatar
+            size={72}
+            expression={isResting ? 'rest' : completedSets > 0 ? 'cheer' : 'point'}
+          />
+          <div className="space-y-1">
+            <p className="font-semibold">Rie-chan says</p>
+            <p className="text-sm text-muted-foreground">{statusMessage}</p>
+          </div>
+        </div>
 
         <div className="flex gap-4 w-full">
           <Button variant="outline" className="flex-1 h-14" size="lg" onClick={skipSet}>

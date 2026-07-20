@@ -1,4 +1,5 @@
 import { deriveBodyParts } from './exerciseTaxonomy'
+import { getBMIStatus, type BMIStatus } from './utils'
 
 interface UserProfile {
   age: number
@@ -54,6 +55,8 @@ interface WorkoutPlan {
   estimatedDuration: number
 }
 
+type BodyPriority = 'build' | 'balance' | 'reduce'
+
 function hasGoal(goals: string[], keywords: string[]) {
   return goals.some((goal) => keywords.some((keyword) => goal.includes(keyword)))
 }
@@ -87,6 +90,17 @@ function getGoalProfile(goals: string[]) {
     posture: hasGoal(goals, ['better_posture']),
     core: hasGoal(goals, ['core_strength', 'pelvic_floor']),
   }
+}
+
+function getBodyStatus(profile: UserProfile): BMIStatus {
+  return getBMIStatus(profile.weight, profile.height).status
+}
+
+function getBodyPriority(profile: UserProfile): BodyPriority {
+  const status = getBodyStatus(profile)
+  if (status === 'underweight') return 'build'
+  if (status === 'overweight' || status === 'obese') return 'reduce'
+  return 'balance'
 }
 
 function getGoalDriversForFocus(goals: string[], focus: string, categories: string[]) {
@@ -350,7 +364,7 @@ const EXERCISE_DATABASE = RAW_EXERCISE_DATABASE.map((exercise) => ({
   bodyParts: deriveBodyParts(exercise),
 }))
 
-function getRepRange(experience: string, goals: string[]): { min: number, max: number } {
+function getRepRange(experience: string, goals: string[], bodyStatus: BMIStatus): { min: number, max: number } {
   const goalProfile = getGoalProfile(goals)
 
   if (goalProfile.strength) {
@@ -364,10 +378,16 @@ function getRepRange(experience: string, goals: string[]): { min: number, max: n
   if (goalProfile.mobility || goalProfile.posture || goalProfile.core) {
     return { min: 8, max: 15 }
   }
+  if (bodyStatus === 'underweight') {
+    return { min: 6, max: 10 }
+  }
+  if (bodyStatus === 'overweight' || bodyStatus === 'obese') {
+    return { min: 10, max: 15 }
+  }
   return { min: 8, max: 12 }
 }
 
-function getSetCount(experience: string, goals: string[]): number {
+function getSetCount(experience: string, goals: string[], bodyStatus: BMIStatus): number {
   const goalProfile = getGoalProfile(goals)
 
   if (goalProfile.mobility) {
@@ -385,15 +405,15 @@ function getSetCount(experience: string, goals: string[]): number {
   if (goalProfile.strength || goalProfile.conditioning) {
     if (experience === 'beginner') return 3
     if (experience === 'intermediate') return 4
-    return 5
+    return bodyStatus === 'underweight' ? 5 : 4
   }
 
   if (experience === 'beginner') return 3
   if (experience === 'intermediate') return 4
-  return 5
+  return bodyStatus === 'underweight' ? 5 : 4
 }
 
-function getRestTime(experience: string, exerciseType: string, goals: string[]): number {
+function getRestTime(experience: string, exerciseType: string, goals: string[], bodyStatus: BMIStatus): number {
   const goalProfile = getGoalProfile(goals)
 
   if (goalProfile.mobility) {
@@ -406,6 +426,14 @@ function getRestTime(experience: string, exerciseType: string, goals: string[]):
 
   if (goalProfile.conditioning) {
     return exerciseType === 'compound' ? 45 : 30
+  }
+
+  if (bodyStatus === 'underweight') {
+    return exerciseType === 'compound' ? 120 : 75
+  }
+
+  if (bodyStatus === 'overweight' || bodyStatus === 'obese') {
+    return exerciseType === 'compound' ? 75 : 45
   }
 
   if (exerciseType === 'compound') {
@@ -457,12 +485,15 @@ function exerciseMatchesCategory(exercise: Exercise, category: string) {
 
 function getPreferredCategories(profile: UserProfile, split: string, day: number) {
   const goalProfile = getGoalProfile(profile.goals)
+  const bodyPriority = getBodyPriority(profile)
 
   if (split === 'full_body' || split === 'full_body_3x') {
     if (goalProfile.mobility) return ['Mobility', 'Waist', 'Legs', 'Back']
     if (goalProfile.posture) return ['Back', 'Shoulders', 'Waist', 'Mobility']
     if (goalProfile.core) return ['Waist', 'Legs', 'Back', 'Mobility']
     if (goalProfile.conditioning) return ['Conditioning', 'Waist', 'Legs', 'Back']
+    if (bodyPriority === 'build') return ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Waist']
+    if (bodyPriority === 'reduce') return ['Conditioning', 'Legs', 'Back', 'Waist', 'Shoulders']
     return ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
   }
 
@@ -479,6 +510,12 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
     }
     if (goalProfile.conditioning) {
       return upper ? ['Chest', 'Shoulders', 'Conditioning', 'Waist'] : ['Legs', 'Conditioning', 'Waist']
+    }
+    if (bodyPriority === 'build') {
+      return upper ? ['Chest', 'Back', 'Shoulders', 'Arms'] : ['Legs', 'Waist']
+    }
+    if (bodyPriority === 'reduce') {
+      return upper ? ['Conditioning', 'Back', 'Shoulders', 'Waist'] : ['Legs', 'Conditioning', 'Waist']
     }
     return upper ? ['Chest', 'Back', 'Shoulders', 'Arms'] : ['Legs', 'Core']
   }
@@ -504,12 +541,22 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
     if (phase === 2) return ['Back', 'Conditioning', 'Waist']
     return ['Legs', 'Conditioning', 'Waist']
   }
+  if (bodyPriority === 'build') {
+    if (phase === 1) return ['Chest', 'Back', 'Waist']
+    if (phase === 2) return ['Legs', 'Shoulders', 'Waist']
+    return ['Arms', 'Waist']
+  }
+  if (bodyPriority === 'reduce') {
+    if (phase === 1) return ['Conditioning', 'Waist', 'Legs']
+    if (phase === 2) return ['Back', 'Conditioning', 'Waist']
+    return ['Legs', 'Conditioning', 'Waist']
+  }
   if (phase === 1) return ['Chest', 'Shoulders', 'Arms']
   if (phase === 2) return ['Back', 'Arms']
   return ['Legs', 'Waist']
 }
 
-function buildExerciseSet(experience: string, goals: string[], category: string) {
+function buildExerciseSet(experience: string, goals: string[], category: string, bodyStatus: BMIStatus) {
   const goalProfile = getGoalProfile(goals)
   const sets = category === 'Mobility'
     ? experience === 'beginner'
@@ -523,16 +570,16 @@ function buildExerciseSet(experience: string, goals: string[], category: string)
       ? experience === 'beginner'
         ? 3
         : 4
-      : getSetCount(experience, goals)
+      : getSetCount(experience, goals, bodyStatus)
 
   const repRange =
     category === 'Mobility'
       ? { min: 8, max: 12 }
-      : category === 'Conditioning'
+    : category === 'Conditioning'
         ? { min: 20, max: 30 }
       : (category === 'Core' || category === 'Waist') && (goalProfile.mobility || goalProfile.posture || goalProfile.core)
         ? { min: 10, max: 15 }
-        : getRepRange(experience, goals)
+        : getRepRange(experience, goals, bodyStatus)
 
   const restTime =
     category === 'Mobility'
@@ -541,12 +588,18 @@ function buildExerciseSet(experience: string, goals: string[], category: string)
         ? 30
       : (category === 'Core' || category === 'Waist') && (goalProfile.mobility || goalProfile.posture || goalProfile.core)
         ? 45
-        : getRestTime(experience, category === 'Chest' || category === 'Back' || category === 'Legs' ? 'compound' : 'isolation', goals)
+        : getRestTime(experience, category === 'Chest' || category === 'Back' || category === 'Legs' ? 'compound' : 'isolation', goals, bodyStatus)
 
   const targetReps = Math.round((repRange.min + repRange.max) / 2)
+  const adjustedReps =
+    bodyStatus === 'underweight' && category !== 'Conditioning' && category !== 'Mobility'
+      ? Math.max(targetReps - 2, 4)
+      : bodyStatus === 'obese' && category === 'Conditioning'
+        ? Math.max(targetReps - 4, 12)
+        : targetReps
 
   return Array.from({ length: sets }, () => ({
-    reps: targetReps,
+    reps: adjustedReps,
     restTime,
   }))
 }
@@ -554,6 +607,7 @@ function buildExerciseSet(experience: string, goals: string[], category: string)
 function buildDay(day: number, focus: string, categories: string[], profile: UserProfile) {
   const availableExercises = filterExercisesByInjury(filterExercisesByEquipment(EXERCISE_DATABASE, profile.equipment || ''), profile.injuries)
   const goalProfile = getGoalProfile(profile.goals)
+  const bodyStatus = getBodyStatus(profile)
   const categoryPreferences: Record<string, string[]> = {
     Chest: ['barbell_bench_press', 'barbell_decline_bench_press', '0047', '0122', '0151', '0169', '0171', 'assisted_chest_dip_kneeling', 'assisted_wide_grip_chest_dip_kneeling', 'band_bench_press', 'band_one_arm_twisting_chest_press', 'archer_push_up'],
     Back: ['alternate_lateral_pulldown', '0970', '0974', '0983', '0027', '3017', 'assisted_parallel_close_grip_pull_up', 'assisted_pull_up', 'band_assisted_pull_up', 'band_close_grip_pulldown', 'band_kneeling_one_arm_pulldown', 'archer_pull_up', 'band_shrug'],
@@ -562,6 +616,14 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
     Legs: ['barbell_full_squat', 'barbell_front_squat', 'barbell_one_leg_squat', 'barbell_straight_leg_deadlift', 'barbell_good_morning', '0032', 'backward_jump', '0980', '0987', '0991', '1008', 'band_step_up', 'band_single_leg_split_squat', 'barbell_glute_bridge', 'low_glute_bridge_on_floor', 'resistance_band_hip_thrusts_on_knees', 'single_leg_bridge_with_outstretched_leg', 'side_hip_abduction'],
     Waist: ['0001', '0002', '0006', '0011', '0014', '0969', '0971', '0972', '0979', '0981', '0985', '0992', '1005', '1011', '1014', '0071', '0084', '0094', '0103', '0112', '3544', '2466', '0873', '0211', '0212', '2399', '0222', '0223', '0226', '0874', '0230', '0242', '0243', '0862', '2963', '0262', '0267', '3204', '2333', '2355'],
     Conditioning: ['0003', '3360', '3223', '3637', '0630', '2612', '1160', '0858'],
+  }
+
+  if (bodyStatus === 'overweight' || bodyStatus === 'obese') {
+    categoryPreferences.Conditioning = ['0798', '2141', '3666', '2138', '0003', '0630', '2612', '3360', '3223', '3637']
+  }
+
+  if (bodyStatus === 'underweight') {
+    categoryPreferences.Conditioning = ['0003', '0630', '2612', '0798', '2141']
   }
   const selectedExercises = new Map<string, WorkoutExercise>()
 
@@ -595,10 +657,12 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
       selectedExercises.set(exercise.id, {
         exerciseId: exercise.id,
         name: exercise.name,
-        sets: buildExerciseSet(profile.experienceLevel, profile.goals, exercise.category),
+        sets: buildExerciseSet(profile.experienceLevel, profile.goals, exercise.category, bodyStatus),
         notes:
           exercise.category === 'Conditioning'
-            ? 'Cardio interval focus. Keep your pace sustainable and steady.'
+            ? bodyStatus === 'overweight' || bodyStatus === 'obese'
+              ? 'Low-impact cardio focus. Keep the effort steady and joint-friendly.'
+              : 'Cardio interval focus. Keep your pace sustainable and steady.'
             : exercise.id.includes('glute') || exercise.id.includes('hip')
               ? 'Glute-focused work for endurance, hip drive, and pelvic support.'
               : undefined,
