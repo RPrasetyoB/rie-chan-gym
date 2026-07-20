@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Flame, Trophy, Target, TrendingUp, Clock, Dumbbell, RefreshCw } from 'lucide-react'
+import { Flame, Trophy, Target, TrendingUp, Clock, Dumbbell } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
@@ -69,7 +69,6 @@ export default function DashboardPage() {
     data: dashboardData,
     isLoading: isSyncing,
     dataUpdatedAt,
-    refetch: syncDashboard,
   } = useQuery<DashboardData>({
     queryKey: dashboardCacheKey,
     staleTime: 1000 * 60 * 2,
