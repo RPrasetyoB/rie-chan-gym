@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, Scale, Camera, Trophy, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet } from '@/lib/api'
 import { loadOnboardingState } from '@/lib/onboardingStorage'
+import { getWorkoutStats, loadWorkoutHistory, type WorkoutCompletion } from '@/lib/appState'
 
 type ProgressSummary = {
   streak: number
@@ -30,49 +32,78 @@ type ProfileResponse = {
     | null
 }
 
+type ProgressData = {
+  summary: ProgressSummary
+  sessions: WorkoutSession[]
+  currentWeight: number
+}
+
 export default function ProgressPage() {
   const [selectedTab, setSelectedTab] = useState<'weight' | 'measurements' | 'photos'>('weight')
-  const [summary, setSummary] = useState<ProgressSummary>({
+  const onboardingState = loadOnboardingState()
+  const localStats = getWorkoutStats()
+  const localWorkoutHistory = loadWorkoutHistory()
+  const localSessions: WorkoutSession[] = localWorkoutHistory.map((entry: WorkoutCompletion, index) => ({
+    id: `${entry.completedAt ?? 'local'}-${index}`,
+    planName: entry.planName,
+    exercises: entry.exercises,
+    sets: entry.sets,
+    status: 'completed',
+    completedAt: entry.completedAt,
+  }))
+  const localSummary: ProgressSummary = {
+    streak: localStats.currentStreak,
+    totalWorkouts: localStats.totalWorkouts,
+    totalVolume: localStats.totalVolume,
+  }
+  const progressCacheKey = ['progress-overview', onboardingState.profile?.name ?? 'guest']
+
+  const {
+    data: progressData,
+    isLoading,
+    dataUpdatedAt,
+    refetch: syncProgress,
+  } = useQuery<ProgressData>({
+    queryKey: progressCacheKey,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+    placeholderData: {
+      summary: localSummary,
+      sessions: localSessions,
+      currentWeight: onboardingState.profile?.weight ?? 73,
+    },
+    queryFn: async () => {
+      try {
+        const [summaryResponse, sessionsResponse, profileResponse] = await Promise.all([
+          apiGet<{ summary: ProgressSummary }>('/progress/summary'),
+          apiGet<{ sessions: WorkoutSession[] }>('/progress/history'),
+          apiGet<ProfileResponse>('/profile'),
+        ])
+
+        return {
+          summary: summaryResponse.summary,
+          sessions: sessionsResponse.sessions,
+          currentWeight: profileResponse.profile?.weight ?? onboardingState.profile?.weight ?? 73,
+        }
+      } catch {
+        return {
+          summary: localSummary,
+          sessions: localSessions,
+          currentWeight: onboardingState.profile?.weight ?? 73,
+        }
+      }
+    },
+  })
+
+  const summary = progressData?.summary ?? {
     streak: 0,
     totalWorkouts: 0,
     totalVolume: 0,
-  })
-  const [sessions, setSessions] = useState<WorkoutSession[]>([])
-  const [currentWeight, setCurrentWeight] = useState<number | null>(null)
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
-  const onboardingState = loadOnboardingState()
-
-  const syncProgress = async () => {
-    try {
-      const [summaryResponse, sessionsResponse, profileResponse] = await Promise.all([
-        apiGet<{ summary: ProgressSummary }>('/progress/summary'),
-        apiGet<{ sessions: WorkoutSession[] }>('/progress/history'),
-        apiGet<ProfileResponse>('/profile'),
-      ])
-
-      setSummary(summaryResponse.summary)
-      setSessions(sessionsResponse.sessions)
-      setCurrentWeight(profileResponse.profile?.weight ?? onboardingState.profile?.weight ?? 73)
-      setLastSyncedAt(new Date())
-    } catch {
-      setSummary({
-        streak: sessions.length > 0 ? Math.min(sessions.length, 7) : 0,
-        totalWorkouts: sessions.length,
-        totalVolume: sessions.reduce((sum, session) => sum + session.sets * 250, 0),
-      })
-      setCurrentWeight(onboardingState.profile?.weight ?? 73)
-    }
   }
-
-  useEffect(() => {
-    syncProgress()
-
-    const timer = window.setInterval(() => {
-      syncProgress()
-    }, 20000)
-
-    return () => window.clearInterval(timer)
-  }, [])
+  const sessions = progressData?.sessions ?? []
+  const currentWeight = progressData?.currentWeight ?? onboardingState.profile?.weight ?? 73
+  const lastSyncedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null
 
   const recentSessions = useMemo(
     () =>
@@ -82,13 +113,13 @@ export default function ProgressPage() {
         .map((session) => ({
           exercise: session.planName,
           weight: session.exercises * 10 + session.sets * 2,
-          date: session.completedAt?.slice(0, 10) ?? '—',
+          date: session.completedAt?.slice(0, 10) ?? 'N/A',
         })),
     [sessions],
   )
 
   const weightData = useMemo(() => {
-    const baseWeight = currentWeight ?? 73
+    const baseWeight = currentWeight
     const points = Math.min(5, Math.max(3, recentSessions.length + 1))
 
     return Array.from({ length: points }, (_, index) => ({
@@ -125,7 +156,7 @@ export default function ProgressPage() {
             Live progress synced from your workout sessions
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={syncProgress} aria-label="Refresh progress">
+        <Button variant="outline" size="icon" onClick={() => syncProgress()} aria-label="Refresh progress">
           <RefreshCw className="h-5 w-5" />
         </Button>
       </div>
@@ -196,7 +227,7 @@ export default function ProgressPage() {
             <CardContent>
               <div className="text-center mb-4">
                 <p className="text-4xl font-display font-bold text-primary">
-                  {(currentWeight ?? onboardingState.profile?.weight ?? 73).toFixed(1)} kg
+                  {currentWeight.toFixed(1)} kg
                 </p>
                 <p className="text-sm text-muted-foreground">Current weight</p>
                 <p className="text-sm text-green-500 mt-1">-2 kg from start</p>
@@ -292,6 +323,7 @@ export default function ProgressPage() {
         <RieChanAvatar size={48} feature="progress" />
         <p className="text-muted-foreground text-sm">Keep up the great work! 💪</p>
       </div>
+      {isLoading && <span className="sr-only">Loading progress data</span>}
     </div>
   )
 }

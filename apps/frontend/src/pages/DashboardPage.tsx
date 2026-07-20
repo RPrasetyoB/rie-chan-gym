@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Flame, Calendar, Trophy, Target, TrendingUp, Clock, Dumbbell, MessageSquare, RefreshCw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Flame, Trophy, Target, TrendingUp, Clock, Dumbbell, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet } from '@/lib/api'
 import { generateWorkoutPlan } from '@/lib/recommendationEngine'
 import { calculateAgeFromBirthday, loadOnboardingState } from '@/lib/onboardingStorage'
-import { getWorkoutStats, loadAuthSession } from '@/lib/appState'
+import { getWorkoutStats, loadAuthSession, loadWorkoutHistory, type WorkoutCompletion } from '@/lib/appState'
 import { getBMIStatus, getFitWeightTarget } from '@/lib/utils'
 
 type WorkoutPlan = ReturnType<typeof generateWorkoutPlan> | null
@@ -18,19 +19,11 @@ type DashboardSummary = {
   totalVolume: number
 }
 
-type DashboardResponse = {
-  summary: DashboardSummary
-  plan: WorkoutPlan
-  history: Array<{
-    id: string
-    planName: string
-    exercises: number
-    sets: number
-    completedAt?: string
-  }>
+type DashboardHistoryItem = WorkoutCompletion & {
+  id: string
 }
 
-type ProfilePayload = {
+type DashboardProfile = {
   birthday: string
   name?: string
   height: number
@@ -42,7 +35,13 @@ type ProfilePayload = {
   equipment?: string
   workoutDays: number
   sessionDuration: number
-  goals: string[]
+} | null
+
+type DashboardData = {
+  summary: DashboardSummary
+  plan: WorkoutPlan
+  history: DashboardHistoryItem[]
+  profile: DashboardProfile
 }
 
 export default function DashboardPage() {
@@ -58,69 +57,73 @@ export default function DashboardPage() {
         goals,
       })
     : null
+  const localWorkoutHistory = loadWorkoutHistory()
+  const workoutStats = getWorkoutStats()
+  const dashboardCacheKey = ['dashboard-overview', authSession?.email ?? localProfile?.name ?? 'guest']
+  const localDashboardHistory: DashboardHistoryItem[] = localWorkoutHistory.map((entry, index) => ({
+    ...entry,
+    id: `${entry.completedAt ?? 'local'}-${index}`,
+  }))
 
-  const [remoteSummary, setRemoteSummary] = useState<DashboardSummary | null>(null)
-  const [remotePlan, setRemotePlan] = useState<WorkoutPlan>(null)
-  const [remoteHistory, setRemoteHistory] = useState<DashboardResponse['history']>([])
-  const [remoteProfile, setRemoteProfile] = useState<ProfilePayload | null>(null)
-  const [isSyncing, setIsSyncing] = useState(true)
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
-
-  const syncDashboard = async () => {
-    try {
+  const {
+    data: dashboardData,
+    isLoading: isSyncing,
+    dataUpdatedAt,
+    refetch: syncDashboard,
+  } = useQuery<DashboardData>({
+    queryKey: dashboardCacheKey,
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    placeholderData: {
+      summary: {
+        streak: workoutStats.currentStreak,
+        totalWorkouts: workoutStats.totalWorkouts || 42,
+        totalVolume: workoutStats.totalVolume || 125000,
+      },
+      plan: localWorkoutPlan,
+      history: localDashboardHistory,
+      profile: localProfile ?? null,
+    },
+    queryFn: async () => {
       const [summaryResponse, planResponse, historyResponse, profileResponse] = await Promise.all([
         apiGet<{ summary: DashboardSummary }>('/progress/summary'),
         apiGet<{ plan: WorkoutPlan }>('/workouts/plan/current'),
-        apiGet<{ sessions: DashboardResponse['history'] }>('/workouts/history'),
-        apiGet<{ profile: ProfilePayload | null }>('/profile'),
+        apiGet<{ sessions: DashboardHistoryItem[] }>('/workouts/history'),
+        apiGet<{ profile: DashboardProfile }>('/profile'),
       ])
 
-      setRemoteSummary(summaryResponse.summary)
-      setRemotePlan(planResponse.plan)
-      setRemoteHistory(historyResponse.sessions)
-      setRemoteProfile(profileResponse.profile)
-      setLastSyncedAt(new Date())
-    } catch {
-      setRemoteSummary(null)
-      setRemotePlan(null)
-      setRemoteHistory([])
-      setRemoteProfile(null)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
+      return {
+        summary: summaryResponse.summary,
+        plan: planResponse.plan,
+        history: historyResponse.sessions,
+        profile: profileResponse.profile,
+      }
+    },
+  })
 
-  useEffect(() => {
-    syncDashboard()
-
-    const timer = window.setInterval(() => {
-      syncDashboard()
-    }, 20000)
-
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const resolvedProfile = remoteProfile ?? localProfile
-  const resolvedPlan = remotePlan ?? localWorkoutPlan
-  const workoutStats = getWorkoutStats()
+  const resolvedProfile = dashboardData?.profile ?? localProfile
+  const resolvedPlan = dashboardData?.plan ?? localWorkoutPlan
   const bmiStatus = resolvedProfile
     ? getBMIStatus(resolvedProfile.weight, resolvedProfile.height)
     : null
   const fitWeightTarget = resolvedProfile
     ? getFitWeightTarget(resolvedProfile.weight, resolvedProfile.height)
     : null
-  const summary = remoteSummary ?? {
+  const summary = dashboardData?.summary ?? {
     streak: workoutStats.currentStreak,
     totalWorkouts: workoutStats.totalWorkouts || 42,
     totalVolume: workoutStats.totalVolume || 125000,
   }
+  const remoteHistory = dashboardData?.history ?? []
+  const lastSyncedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null
 
   const todayWorkout = {
     name: resolvedPlan?.name ?? 'Upper Body Push',
     exercises: resolvedPlan?.schedule[0]?.exercises.length ?? 6,
     estimatedDuration: resolvedPlan?.estimatedDuration ?? 45,
     focus: resolvedPlan?.schedule[0]?.focus ?? 'Full Body',
-    goalDrivers: resolvedPlan?.schedule[0]?.goalDrivers ?? goals.map((goal) => goal.replace(/_/g, ' ')),
+    goalDrivers: resolvedPlan?.schedule[0]?.goalDrivers ?? goals.map((goal: string) => goal.replace(/_/g, ' ')),
     completed: false,
   }
 
@@ -163,10 +166,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RieChanAvatar size={48} feature="dashboard" />
-          <Button variant="outline" size="icon" onClick={syncDashboard} aria-label="Refresh dashboard">
-            <RefreshCw className="h-5 w-5" />
-          </Button>
+          <RieChanAvatar size={64} feature="dashboard" />
         </div>
       </div>
 
@@ -319,21 +319,6 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Link to="/calendar">
-          <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-            <Calendar className="h-5 w-5" />
-            <span className="text-sm">Calendar</span>
-          </Button>
-        </Link>
-        <Link to="/ai-coach">
-          <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-            <MessageSquare className="h-5 w-5" />
-            <span className="text-sm">Ask Rie-chan</span>
-          </Button>
-        </Link>
-      </div>
     </div>
   )
 }

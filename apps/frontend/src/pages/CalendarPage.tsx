@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,38 +15,54 @@ type CalendarResponse = {
   }>
 }
 
+type CalendarData = {
+  plan: CalendarResponse['plan']
+  sessions: CalendarResponse['sessions']
+}
+
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [remotePlan, setRemotePlan] = useState<CalendarResponse['plan']>(null)
-  const [remoteSessions, setRemoteSessions] = useState<CalendarResponse['sessions']>([])
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
   const localPlan = getCurrentWorkoutPlan()
-  const localSessions = loadWorkoutHistory()
+  const localCalendarSessions = loadWorkoutHistory().map((entry, index) => ({
+    id: `${entry.completedAt ?? 'local'}-${index}`,
+    completedAt: entry.completedAt,
+    status: 'completed' as const,
+  }))
+  const calendarCacheKey = ['calendar-overview', localPlan?.name ?? 'default']
 
-  const syncCalendar = async () => {
-    try {
-      const response = await apiGet<CalendarResponse>('/calendar')
-      setRemotePlan(response.plan)
-      setRemoteSessions(response.sessions)
-      setLastSyncedAt(new Date())
-    } catch {
-      setRemotePlan(null)
-      setRemoteSessions([])
-    }
-  }
+  const {
+    data: calendarData,
+    isLoading,
+    dataUpdatedAt,
+    refetch: syncCalendar,
+  } = useQuery<CalendarData>({
+    queryKey: calendarCacheKey,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+    placeholderData: {
+      plan: localPlan,
+      sessions: localCalendarSessions,
+    },
+    queryFn: async () => {
+      try {
+        const response = await apiGet<CalendarResponse>('/calendar')
+        return {
+          plan: response.plan,
+          sessions: response.sessions,
+        }
+      } catch {
+        return {
+          plan: localPlan,
+          sessions: localCalendarSessions,
+        }
+      }
+    },
+  })
 
-  useEffect(() => {
-    syncCalendar()
-
-    const timer = window.setInterval(() => {
-      syncCalendar()
-    }, 30000)
-
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const workoutPlan = remotePlan ?? localPlan
-  const workoutHistory = remoteSessions.length > 0 ? remoteSessions : localSessions
+  const workoutPlan = calendarData?.plan ?? localPlan
+  const workoutHistory = calendarData?.sessions?.length ? calendarData.sessions : localCalendarSessions
+  const lastSyncedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -109,7 +126,7 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={syncCalendar} aria-label="Refresh calendar">
+          <Button variant="outline" size="icon" onClick={() => syncCalendar()} aria-label="Refresh calendar">
             <RefreshCw className="h-5 w-5" />
           </Button>
           <Button variant="outline" size="icon">
@@ -211,6 +228,8 @@ export default function CalendarPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isLoading && <span className="sr-only">Loading calendar data</span>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Search, Dumbbell, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,42 +25,46 @@ function uniqueBodyParts(exercise: Exercise) {
   return Array.from(new Set(exercise.bodyParts?.length ? exercise.bodyParts : deriveBodyParts(exercise)))
 }
 
+type ExercisesData = {
+  exercises: Exercise[]
+}
+
 export default function ExercisesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedEquipments, setSelectedEquipments] = useState<string[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const exerciseCacheKey = ['exercise-library', 'catalog']
 
-  const loadExercises = async () => {
-    try {
-      const response = await apiGet<{ exercises: Exercise[] }>('/exercises')
-      setExercises(response.exercises)
-      setLastUpdated(new Date())
-    } catch {
-      setExercises([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const {
+    data: exercisesData,
+    isLoading,
+    dataUpdatedAt,
+    refetch: loadExercises,
+  } = useQuery<ExercisesData>({
+    queryKey: exerciseCacheKey,
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24,
+    refetchOnWindowFocus: false,
+    placeholderData: {
+      exercises: [],
+    },
+    queryFn: async () => {
+      try {
+        const response = await apiGet<ExercisesData>('/exercises')
+        return response
+      } catch {
+        return { exercises: [] }
+      }
+    },
+  })
 
-  useEffect(() => {
-    loadExercises()
-
-    const timer = window.setInterval(() => {
-      loadExercises()
-    }, 30000)
-
-    return () => window.clearInterval(timer)
-  }, [])
+  const exercises = exercisesData?.exercises ?? []
 
   const normalizedExercises = useMemo(
     () =>
       exercises.map((exercise) => ({
         ...exercise,
-        difficulty:
-          exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1),
+        difficulty: exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1),
         equipment: exercise.equipment.charAt(0).toUpperCase() + exercise.equipment.slice(1),
       })),
     [exercises],
@@ -68,10 +73,7 @@ export default function ExercisesPage() {
   const normalizeEquipment = (value: string) =>
     value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-  const categories = useMemo(
-    () => ['All', ...BODY_PART_ORDER],
-    [],
-  )
+  const categories = useMemo(() => ['All', ...BODY_PART_ORDER], [])
 
   const equipmentLabel = useMemo(() => {
     if (selectedEquipments.length === 0) return 'Any equipment'
@@ -99,6 +101,8 @@ export default function ExercisesPage() {
     )
   }
 
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null
+
   return (
     <div className="p-4 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
@@ -109,7 +113,7 @@ export default function ExercisesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={loadExercises} aria-label="Refresh exercises">
+          <Button variant="outline" size="icon" onClick={() => loadExercises()} aria-label="Refresh exercises">
             <RefreshCw className="h-5 w-5" />
           </Button>
           <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
@@ -195,7 +199,11 @@ export default function ExercisesPage() {
       </div>
 
       <div className="mb-4 text-xs text-muted-foreground">
-        {isLoading ? 'Syncing live exercise catalog...' : lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Catalog ready'}
+        {isLoading
+          ? 'Syncing live exercise catalog...'
+          : lastUpdated
+            ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+            : 'Catalog ready'}
       </div>
 
       <div className="space-y-3">
@@ -259,6 +267,8 @@ export default function ExercisesPage() {
           ))
         )}
       </div>
+
+      {lastUpdated && <span className="sr-only">Last updated {lastUpdated.toISOString()}</span>}
     </div>
   )
 }

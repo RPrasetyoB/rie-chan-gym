@@ -9,7 +9,13 @@ export type AuthTokens = {
   refreshToken: string
 }
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+const configuredApiBaseUrl = import.meta.env.VITE_API_URL?.trim()
+
+if (import.meta.env.PROD && !configuredApiBaseUrl) {
+  console.warn('VITE_API_URL is missing in production. API calls will fail until it is set.')
+}
+
+export const API_BASE_URL = configuredApiBaseUrl ?? '/api/v1'
 const AUTH_TOKEN_KEY = 'rie-chan-auth-tokens'
 let refreshPromise: Promise<AuthTokens | null> | null = null
 
@@ -39,6 +45,10 @@ export function clearAuthTokens() {
 }
 
 function buildUrl(path: string) {
+  if (import.meta.env.PROD && !configuredApiBaseUrl) {
+    throw new Error('Production API URL is not configured. Set VITE_API_URL to your backend deployment URL.')
+  }
+
   const base = API_BASE_URL.replace(/\/$/, '')
   const suffix = path.startsWith('/') ? path : `/${path}`
   return `${base}${suffix}`
