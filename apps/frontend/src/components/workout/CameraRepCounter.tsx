@@ -11,9 +11,6 @@ import {
   type CameraTrackingMode,
   type PoseLandmark,
 } from '@/lib/poseCounter'
-import * as tf from '@tensorflow/tfjs-core'
-import '@tensorflow/tfjs-backend-webgl'
-import { load as loadMoveNetDetector } from '@tensorflow-models/pose-detection/dist/movenet/detector'
 import type { MoveNetModelConfig } from '@tensorflow-models/pose-detection/dist/movenet/types'
 import type { PoseDetector } from '@tensorflow-models/pose-detection/dist/pose_detector'
 import type { Pose } from '@tensorflow-models/pose-detection/dist/types'
@@ -24,6 +21,10 @@ let poseDetectorPromise: Promise<PoseDetector> | null = null
 async function loadPoseDetector() {
   if (!poseDetectorPromise) {
     poseDetectorPromise = (async () => {
+      const tf = await import('@tensorflow/tfjs-core')
+      await import('@tensorflow/tfjs-backend-webgl')
+      const { load: loadMoveNetDetector } = await import('@tensorflow-models/pose-detection/dist/movenet/detector')
+
       await tf.setBackend('webgl')
       await tf.ready()
 

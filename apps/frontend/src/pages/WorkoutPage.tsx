@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Play, SkipForward, Check, X, BarChart3, TimerReset, Maximize2, Minimize2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CameraRepCounter } from '@/components/workout/CameraRepCounter'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet, apiPost } from '@/lib/api'
 import { getExerciseMedia } from '@/lib/exerciseMedia'
@@ -41,6 +40,14 @@ interface WorkoutPlanView {
 
 interface WorkoutSessionResponse {
   session: { id: string }
+}
+
+const CameraRepCounter = lazy(() =>
+  import('@/components/workout/CameraRepCounter').then((module) => ({ default: module.CameraRepCounter })),
+)
+
+function CameraRepCounterFallback() {
+  return <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">Loading camera tracker...</div>
 }
 
 const fallbackWorkout: WorkoutExercise[] = [
@@ -516,16 +523,18 @@ export default function WorkoutPage() {
         <div className="fixed inset-0 z-50 bg-black text-white">
           <div className="relative h-full w-full overflow-hidden">
             <div className="absolute inset-0">
-              <CameraRepCounter
-                exerciseId={currentExercise?.id}
-                exerciseName={currentExercise?.name}
-                isWorkoutActive={isWorkoutActive}
-                isTrackingEnabled={!isResting}
-                showControls={false}
-                className="h-full w-full rounded-none bg-black"
-                onRepCountChange={setCurrentReps}
-                onCameraActiveChange={setIsCameraActive}
-              />
+              <Suspense fallback={<CameraRepCounterFallback />}>
+                <CameraRepCounter
+                  exerciseId={currentExercise?.id}
+                  exerciseName={currentExercise?.name}
+                  isWorkoutActive={isWorkoutActive}
+                  isTrackingEnabled={!isResting}
+                  showControls={false}
+                  className="h-full w-full rounded-none bg-black"
+                  onRepCountChange={setCurrentReps}
+                  onCameraActiveChange={setIsCameraActive}
+                />
+              </Suspense>
             </div>
 
             <div className="absolute left-4 top-4 z-20 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-md">
@@ -644,14 +653,16 @@ export default function WorkoutPage() {
 
               {/* <div className="px-4 pt-2 pb-4 space-y-2"> */}
                 <div className="rounded-lg bg-card/60 p-1.5">
-                  <CameraRepCounter
-                    exerciseId={currentExercise?.id}
-                    exerciseName={currentExercise?.name}
-                    isWorkoutActive={isWorkoutActive}
-                    isTrackingEnabled={!isResting}
-                    onRepCountChange={setCurrentReps}
-                    onCameraActiveChange={setIsCameraActive}
-                  />
+                  <Suspense fallback={<CameraRepCounterFallback />}>
+                    <CameraRepCounter
+                      exerciseId={currentExercise?.id}
+                      exerciseName={currentExercise?.name}
+                      isWorkoutActive={isWorkoutActive}
+                      isTrackingEnabled={!isResting}
+                      onRepCountChange={setCurrentReps}
+                      onCameraActiveChange={setIsCameraActive}
+                    />
+                  </Suspense>
                 </div>
               {/* </div> */}
             </CardContent>
