@@ -1,11 +1,14 @@
 import express from 'express'
 import cors from 'cors'
-import { default as helmet } from 'helmet'
+import { createRequire } from 'module'
 import morgan from 'morgan'
 import { env } from './config/env.js'
 import { apiRouter } from './routes/index.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { notFound } from './middleware/notFound.js'
+
+const require = createRequire(import.meta.url)
+const helmet = require('helmet') as () => any
 
 export function createApp() {
   const app = express()
