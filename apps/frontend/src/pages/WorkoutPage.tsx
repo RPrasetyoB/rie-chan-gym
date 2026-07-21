@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Play, SkipForward, Check, X, BarChart3, TimerReset, Maximize2, Minimize2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet, apiPost } from '@/lib/api'
 import { getExerciseMedia } from '@/lib/exerciseMedia'
@@ -42,12 +43,104 @@ interface WorkoutSessionResponse {
   session: { id: string }
 }
 
+const cheerMessages = [
+  'GO GO GO!!',
+  'YOU CAN DO IT!!',
+  'KEEP PUSHING!!',
+  'ALMOST THERE!!',
+  "LET'S CRUSH IT!!",
+]
+
 const CameraRepCounter = lazy(() =>
   import('@/components/workout/CameraRepCounter').then((module) => ({ default: module.CameraRepCounter })),
 )
 
 function CameraRepCounterFallback() {
-  return <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">Loading camera tracker...</div>
+  return (
+    <div className="space-y-4 rounded-lg border border-border bg-secondary/20 p-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-56" />
+        </div>
+      </div>
+      <Skeleton className="aspect-video w-full rounded-xl" />
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-16 rounded-lg" />
+        <Skeleton className="h-16 rounded-lg" />
+      </div>
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  )
+}
+
+function WorkoutLoadingSkeleton() {
+  return (
+    <div className="p-4 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2 text-center">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <Skeleton className="h-10 w-32 rounded-lg" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] items-start">
+        <Card className="overflow-hidden border border-primary/20 bg-primary/5">
+          <CardHeader className="border-b border-border/70 bg-background/40 pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+              <Skeleton className="h-7 w-28 rounded-full" />
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <Skeleton className="aspect-video w-full rounded-none" />
+            <div className="rounded-lg bg-card/60 p-1.5">
+              <CameraRepCounterFallback />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border bg-card">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+              <div className="space-y-2 text-right">
+                <Skeleton className="h-3 w-14" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+              <Skeleton className="h-20 rounded-lg" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-16 rounded-lg" />
+              <Skeleton className="h-16 rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
 
 const fallbackWorkout: WorkoutExercise[] = [
@@ -111,6 +204,29 @@ function formatTime(totalSeconds: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
+function CheerBubble({ message, compact = false }: { message: string; compact?: boolean }) {
+  return (
+    <div className={compact ? 'relative aspect-[2.05/1] w-[min(13rem,34vw)] shrink-0 -mb-6' : 'relative aspect-[2.05/1] w-[min(20rem,40vw)] shrink-0'}>
+      <img
+        src="/assets/bubble-text.png"
+        alt=""
+        aria-hidden="true"
+        className={compact
+          ? 'absolute inset-0 h-20 w-48 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.35)]'
+          : 'absolute inset-0 h-40 w-80 object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.35)]'}
+      />
+
+      <div className={compact ? 'relative px-7 py-6 text-center text-black' : 'relative px-12 py-10 text-center text-black'}>
+        <p className={compact
+          ? 'mt-3 mr-2 text-nowrap font-display text-[10px] font-black leading-[0.95] tracking-tight text-black'
+          : 'mt-9 sm:mt-8 text-nowrap font-display text-[10px] sm:ml-2 sm:text-base font-black leading-[0.95] tracking-tight text-black'}>
+          {message}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function WorkoutPage() {
   const localPlan = getCurrentWorkoutPlan()
   const [remotePlan, setRemotePlan] = useState<WorkoutPlanView | null>(null)
@@ -137,6 +253,8 @@ export default function WorkoutPage() {
   const [isFullscreenMode, setIsFullscreenMode] = useState(false)
   const [statusMessage, setStatusMessage] = useState('Ready when you are.')
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
+  const [cheerMessageIndex, setCheerMessageIndex] = useState(0)
+  const [isCompactLandscapePhone, setIsCompactLandscapePhone] = useState(false)
   const fullscreenShellRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -196,6 +314,19 @@ export default function WorkoutPage() {
   }, [isResting])
 
   useEffect(() => {
+    if (!isWorkoutActive) {
+      setCheerMessageIndex(0)
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setCheerMessageIndex((value) => (value + 1) % cheerMessages.length)
+    }, 1800)
+
+    return () => window.clearInterval(timer)
+  }, [isWorkoutActive])
+
+  useEffect(() => {
     const activeWorkout = sessionWorkout ?? workout
     const activeExercise = activeWorkout[currentExerciseIndex]
     const activeSet = activeExercise?.sets[currentSetIndex]
@@ -253,6 +384,23 @@ export default function WorkoutPage() {
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px)')
+
+    const updateCompactLandscape = () => {
+      setIsCompactLandscapePhone(mediaQuery.matches)
+    }
+
+    updateCompactLandscape()
+    mediaQuery.addEventListener('change', updateCompactLandscape)
+    window.addEventListener('resize', updateCompactLandscape)
+
+    return () => {
+      mediaQuery.removeEventListener('change', updateCompactLandscape)
+      window.removeEventListener('resize', updateCompactLandscape)
+    }
   }, [])
 
   const startWorkout = async () => {
@@ -384,16 +532,10 @@ export default function WorkoutPage() {
     }
   }
 
+  const isCompactFullscreen = isFullscreenMode && isCompactLandscapePhone
+
   if (isPlanLoading && !plan) {
-    return (
-      <div className="p-4 max-w-lg mx-auto">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Loading your live workout...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <WorkoutLoadingSkeleton />
   }
 
   if (!isWorkoutActive) {
@@ -537,55 +679,48 @@ export default function WorkoutPage() {
               </Suspense>
             </div>
 
-            <div className="absolute left-4 top-4 z-20 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-md">
+            <div className={isCompactFullscreen ? 'absolute left-2 top-2 z-20 flex items-start gap-2 rounded-xl border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-md' : 'absolute left-4 top-4 z-20 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/60 px-4 py-3 backdrop-blur-md'}>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Set</p>
-                <p className="font-display text-2xl font-bold leading-none">
+                <p className={isCompactFullscreen ? 'text-[9px] uppercase tracking-[0.18em] text-white/60' : 'text-[11px] uppercase tracking-[0.2em] text-white/60'}>Set</p>
+                <p className={isCompactFullscreen ? 'font-display text-lg font-bold leading-none' : 'font-display text-2xl font-bold leading-none'}>
                   {currentSetIndex + 1}/{currentExercise?.sets.length ?? 0}
                 </p>
               </div>
-              <div className="h-10 w-px bg-white/10" />
+              <div className={isCompactFullscreen ? 'h-8 w-px bg-white/10' : 'h-10 w-px bg-white/10'} />
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Reps</p>
-                <p className="font-display text-2xl font-bold leading-none text-primary">{currentReps}</p>
+                <p className={isCompactFullscreen ? 'text-[9px] uppercase tracking-[0.18em] text-white/60' : 'text-[11px] uppercase tracking-[0.2em] text-white/60'}>Reps</p>
+                <p className={isCompactFullscreen ? 'font-display text-lg font-bold leading-none text-primary' : 'font-display text-2xl font-bold leading-none text-primary'}>{currentReps}</p>
               </div>
-              <div className="h-10 w-px bg-white/10" />
+              <div className={isCompactFullscreen ? 'h-8 w-px bg-white/10' : 'h-10 w-px bg-white/10'} />
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Target</p>
-                <p className="font-display text-2xl font-bold leading-none">{currentSet?.reps ?? 0}</p>
+                <p className={isCompactFullscreen ? 'text-[9px] uppercase tracking-[0.18em] text-white/60' : 'text-[11px] uppercase tracking-[0.2em] text-white/60'}>Target</p>
+                <p className={isCompactFullscreen ? 'font-display text-lg font-bold leading-none' : 'font-display text-2xl font-bold leading-none'}>{currentSet?.reps ?? 0}</p>
               </div>
             </div>
 
             {currentExerciseMedia && (
-              <div className="absolute bottom-4 left-4 z-20 w-[min(34vw,260px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md">
-                <div className="border-b border-white/10 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Exercise</p>
-                  <p className="font-semibold leading-tight">{currentExercise?.name}</p>
-                </div>
+              <div className={isCompactFullscreen ? 'absolute bottom-1 left-1 z-20 w-[min(24vw,180px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md' : 'absolute bottom-1 left-1 z-20 w-[min(34vw,260px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md'}>
                 <img
                   src={currentExerciseMedia.gifUrl}
                   alt={currentExerciseMedia.alt}
-                  className="h-40 w-full object-cover"
+                  className={isCompactFullscreen ? 'h-20 w-full object-cover' : 'h-28 sm:h-40 w-full object-cover'}
                 />
               </div>
             )}
 
-            <div className="absolute bottom-4 right-4 z-20 flex items-end gap-3">
-              <div className="rounded-2xl border border-white/10 bg-black/60 px-4 py-3 text-right backdrop-blur-md">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-white/60">Rie-chibi says</p>
-                <p className="max-w-[14rem] text-sm text-white/85">{statusMessage}</p>
-              </div>
-              <RieChanAvatar size={88} expression="cheer" className="animate-pulse-glow" />
+            <div className={isCompactFullscreen ? 'absolute bottom-2 -right-10 z-20 flex flex-col items-center -gap-6' : 'absolute bottom-4 -right-4 sm:-right-8 z-20 flex flex-col items-center gap-0'}>
+              <CheerBubble message={cheerMessages[cheerMessageIndex]} compact={isCompactFullscreen} />
+              <RieChanAvatar size={isCompactFullscreen ? 64 : 100} expression="cheer" className="animate-bounce-jump" />
             </div>
 
-            <div className="absolute right-4 top-4 z-20 flex gap-2">
+            <div className={isCompactFullscreen ? 'absolute right-2 top-2 z-20 flex gap-2' : 'absolute right-4 top-4 z-20 flex gap-2'}>
               <Button
                 variant="outline"
                 size="sm"
-                className="border-white/20 bg-black/50 text-white hover:bg-black/70 hover:text-white"
+                className={isCompactFullscreen ? 'h-8 border-white/20 bg-black/50 px-3 text-xs text-white hover:bg-black/70 hover:text-white' : 'border-white/20 bg-black/50 text-white hover:bg-black/70 hover:text-white'}
                 onClick={exitFullscreen}
               >
-                <Minimize2 className="h-4 w-4 mr-2" />
+                <Minimize2 className={isCompactFullscreen ? 'mr-1 h-3 w-3' : 'h-4 w-4 mr-2'} />
                 Exit
               </Button>
             </div>
@@ -642,16 +777,16 @@ export default function WorkoutPage() {
 
             <CardContent className="p-0">
               {currentExerciseMedia && (
-                <div className="aspect-video bg-secondary/40 overflow-hidden border-b border-border/70">
+                <div className="aspect-video overflow-hidden border-b border-border/70 p-5">
                   <img
                     src={currentExerciseMedia.gifUrl}
                     alt={currentExerciseMedia.alt}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover rounded-lg"
                   />
                 </div>
               )}
 
-              {/* <div className="px-4 pt-2 pb-4 space-y-2"> */}
+              <div className="px-4 pt-2 pb-4 space-y-2">
                 <div className="rounded-lg bg-card/60 p-1.5">
                   <Suspense fallback={<CameraRepCounterFallback />}>
                     <CameraRepCounter
@@ -664,7 +799,7 @@ export default function WorkoutPage() {
                     />
                   </Suspense>
                 </div>
-              {/* </div> */}
+              </div>
             </CardContent>
           </Card>
 
@@ -747,17 +882,6 @@ export default function WorkoutPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
-          <RieChanAvatar
-            size={72}
-            expression={isResting ? 'rest' : completedSets > 0 ? 'cheer' : 'point'}
-          />
-          <div className="space-y-1">
-            <p className="font-semibold">Rie-chan says</p>
-            <p className="text-sm text-muted-foreground">{statusMessage}</p>
-          </div>
         </div>
 
         <div className="flex gap-4 w-full">

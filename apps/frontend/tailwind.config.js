@@ -76,6 +76,12 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" },
         },
+        "bounce-jump": {
+          "0%, 100%": { transform: "translateY(0) scale(1)" },
+          "35%": { transform: "translateY(-14px) scale(1.04, 0.96)" },
+          "55%": { transform: "translateY(0) scale(0.98, 1.02)" },
+          "70%": { transform: "translateY(-6px) scale(1.01, 0.99)" },
+        },
         "pulse-glow": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
@@ -85,6 +91,7 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
+        "bounce-jump": "bounce-jump 1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
       fontFamily: {

@@ -235,17 +235,19 @@ export function CameraRepCounter({
         setModelLabel('Timer mode')
         setStage('tracking')
         setStatus('Hold steady. Breathe smoothly and keep your position locked in.')
-        return
+      } else {
+        setStatus('Loading browser pose detector...')
       }
 
-      setStatus('Loading browser pose detector...')
       const model = await loadPoseDetector()
       modelRef.current = model
       setModelLabel('MoveNet Lightning')
       setStage('tracking')
       setStatus(
         mode
-          ? `Tracking ${getCameraModeLabel(mode)} reps now with browser pose detection.`
+          ? mode === 'hold'
+            ? 'Tracking your body position with browser pose detection.'
+            : `Tracking ${getCameraModeLabel(mode)} reps now with browser pose detection.`
           : 'Camera preview is active. Rep counting is only available for supported movements.',
       )
 
@@ -284,6 +286,12 @@ export function CameraRepCounter({
       video.srcObject = null
     }
 
+    const canvas = canvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      ctx?.clearRect(0, 0, canvas.width || 0, canvas.height || 0)
+    }
+
     if (isActiveRef.current) {
       setIsActive(false)
     }
@@ -297,6 +305,7 @@ export function CameraRepCounter({
     setPoseDetected(false)
     setConfidence(0)
     setHoldSeconds(0)
+    setModelLabel('not loaded')
   }
 
   function resetCounter() {
@@ -317,10 +326,6 @@ export function CameraRepCounter({
 
   async function loop() {
     if (!isActiveRef.current) return
-
-    if (modeRef.current === 'hold') {
-      return
-    }
 
     const video = videoRef.current
     const model = modelRef.current
@@ -389,7 +394,11 @@ export function CameraRepCounter({
       )
     }
 
-    if (!isTrackingEnabled || !modeRef.current || modeRef.current === 'hold') {
+    if (!isTrackingEnabled || !modeRef.current) {
+      return
+    }
+
+    if (modeRef.current === 'hold') {
       return
     }
 

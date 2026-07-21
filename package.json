@@ -10,11 +10,14 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-    "dev:frontend": "cd apps/frontend && npm run dev",
+    "dev:frontend": "cd apps/frontend && npm run dev -- --force",
     "dev:backend": "cd apps/backend && npm run dev",
     "build": "npm run build:frontend && npm run build:backend && node scripts/copy-frontend-dist.mjs",
     "build:frontend": "cd apps/frontend && npm run build",
     "build:backend": "cd apps/backend && npm run build"
+  },
+  "overrides": {
+    "shell-quote": "1.10.0"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"
