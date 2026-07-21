@@ -22,11 +22,25 @@ async function loadPoseDetector() {
   if (!poseDetectorPromise) {
     poseDetectorPromise = (async () => {
       const tf = await import('@tensorflow/tfjs-core')
+      const trySetBackend = async (backend: 'webgl' | 'cpu') => {
+        if (backend === 'webgl') {
+          await import('@tensorflow/tfjs-backend-webgl')
+        } else {
+          await import('@tensorflow/tfjs-backend-cpu')
+        }
+
+        await tf.setBackend(backend)
+        await tf.ready()
+      }
+
       await import('@tensorflow/tfjs-backend-webgl')
       const { load: loadMoveNetDetector } = await import('@tensorflow-models/pose-detection/dist/movenet/detector')
 
-      await tf.setBackend('webgl')
-      await tf.ready()
+      try {
+        await trySetBackend('webgl')
+      } catch {
+        await trySetBackend('cpu')
+      }
 
       const config: MoveNetModelConfig = {
         modelType: 'SinglePose.Lightning',
@@ -71,6 +85,7 @@ export function CameraRepCounter({
   const [isStarting, setIsStarting] = useState(false)
   const [isActive, setIsActive] = useState(false)
   const [repCount, setRepCount] = useState(0)
+  const [holdSeconds, setHoldSeconds] = useState(0)
   const [confidence, setConfidence] = useState(0)
   const [stage, setStage] = useState<CameraStage>('idle')
   const [poseDetected, setPoseDetected] = useState(false)
@@ -112,6 +127,7 @@ export function CameraRepCounter({
     trackerRef.current = createRepTrackerState()
     repCountRef.current = 0
     setRepCount(0)
+    setHoldSeconds(0)
 
     if (isActiveRef.current) {
       repCountChangeRef.current(0)
@@ -127,12 +143,28 @@ export function CameraRepCounter({
       return
     }
 
-    setStatus(isActive ? `Tracking ${getCameraModeLabel(mode)} reps now.` : `Ready for ${getCameraModeLabel(mode)} reps.`)
+    setStatus(
+      isActive
+        ? mode === 'hold'
+          ? `Hold steady for your ${getCameraModeLabel(mode)} work.`
+          : `Tracking ${getCameraModeLabel(mode)} reps now.`
+        : mode === 'hold'
+          ? `Ready for your ${getCameraModeLabel(mode)} hold.`
+          : `Ready for ${getCameraModeLabel(mode)} reps.`,
+    )
   }, [exerciseId, exerciseName, mode])
 
   useEffect(() => {
     if (!mode) return
-    setStatus(isActive ? `Tracking ${getCameraModeLabel(mode)} reps now.` : `Ready for ${getCameraModeLabel(mode)} reps.`)
+    setStatus(
+      isActive
+        ? mode === 'hold'
+          ? `Hold steady for your ${getCameraModeLabel(mode)} work.`
+          : `Tracking ${getCameraModeLabel(mode)} reps now.`
+        : mode === 'hold'
+          ? `Ready for your ${getCameraModeLabel(mode)} hold.`
+          : `Ready for ${getCameraModeLabel(mode)} reps.`,
+    )
   }, [isActive, mode])
 
   useEffect(() => {
@@ -152,8 +184,18 @@ export function CameraRepCounter({
     }
   }, [isWorkoutActive, mode, isActive, isStarting])
 
+  useEffect(() => {
+    if (!isActive || mode !== 'hold') return
+
+    const timer = window.setInterval(() => {
+      setHoldSeconds((value) => value + 1)
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [isActive, mode])
+
   async function startCamera() {
-    if (!isWorkoutActive || !mode || isStarting || isActive) return
+    if (!isWorkoutActive || isStarting || isActive) return
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Camera access is not available in this browser.')
@@ -182,25 +224,36 @@ export function CameraRepCounter({
       repCountRef.current = 0
       repCountChangeRef.current(0)
       setRepCount(0)
+      setHoldSeconds(0)
       setConfidence(0)
       setPoseDetected(false)
       setModelLabel('loading')
       setStage('loading')
-      setStatus('Loading browser pose detector...')
-
       setIsActive(true)
 
+      if (mode === 'hold') {
+        setModelLabel('Timer mode')
+        setStage('tracking')
+        setStatus('Hold steady. Breathe smoothly and keep your position locked in.')
+        return
+      }
+
+      setStatus('Loading browser pose detector...')
       const model = await loadPoseDetector()
       modelRef.current = model
       setModelLabel('MoveNet Lightning')
       setStage('tracking')
-      setStatus(`Tracking ${getCameraModeLabel(mode)} reps now with browser pose detection.`)
+      setStatus(
+        mode
+          ? `Tracking ${getCameraModeLabel(mode)} reps now with browser pose detection.`
+          : 'Camera preview is active. Rep counting is only available for supported movements.',
+      )
 
       loop()
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Could not start the camera.'
       setError(message)
-      setStatus('Camera counting is unavailable right now.')
+      setStatus(mode === 'hold' ? 'Timer mode is unavailable right now.' : 'Camera counting is unavailable right now.')
       await stopCamera()
     } finally {
       setIsStarting(false)
@@ -243,6 +296,7 @@ export function CameraRepCounter({
     stageRef.current = 'idle'
     setPoseDetected(false)
     setConfidence(0)
+    setHoldSeconds(0)
   }
 
   function resetCounter() {
@@ -251,11 +305,22 @@ export function CameraRepCounter({
     repCountChangeRef.current(0)
     setRepCount(0)
     setConfidence(0)
-    setStatus(mode ? `Counter reset for ${getCameraModeLabel(mode)} reps.` : getCameraModeHint(mode))
+    setHoldSeconds(0)
+    setStatus(
+      mode
+        ? mode === 'hold'
+          ? `Timer reset. Hold ready for ${getCameraModeLabel(mode)} work.`
+          : `Counter reset for ${getCameraModeLabel(mode)} reps.`
+        : getCameraModeHint(mode),
+    )
   }
 
   async function loop() {
     if (!isActiveRef.current) return
+
+    if (modeRef.current === 'hold') {
+      return
+    }
 
     const video = videoRef.current
     const model = modelRef.current
@@ -305,20 +370,26 @@ export function CameraRepCounter({
 
     if (!detected) {
       if (stageRef.current === 'tracking') {
-        setStatus('No body detected. Move into view and keep your working joints visible.')
+        setStatus(
+          modeRef.current
+            ? 'No body detected. Move into view and keep your working joints visible.'
+            : 'Camera preview is active. Move into view to see your outline.',
+        )
       }
       return
     }
 
     if (stageRef.current === 'tracking') {
       setStatus(
-        isTrackingEnabled
-          ? `Body detected. Tracking ${getCameraModeLabel(modeRef.current)} reps now.`
-          : 'Body detected. Rest mode paused rep counting.',
+        modeRef.current
+          ? isTrackingEnabled
+            ? `Body detected. Tracking ${getCameraModeLabel(modeRef.current)} reps now.`
+            : 'Body detected. Rest mode paused rep counting.'
+          : 'Camera preview is active. Rep counting is not enabled for this movement.',
       )
     }
 
-    if (!isTrackingEnabled) {
+    if (!isTrackingEnabled || !modeRef.current || modeRef.current === 'hold') {
       return
     }
 
@@ -390,7 +461,18 @@ export function CameraRepCounter({
   }
 
   const buttonLabel = isActive ? 'Stop camera' : isStarting ? 'Starting camera...' : 'Start camera rep counter'
-  const isButtonDisabled = !isWorkoutActive || !mode || isStarting
+  const isButtonDisabled = !isWorkoutActive || isStarting
+  const displayValue = mode === 'hold' ? holdSeconds : repCount
+  const timingLabel = mode === 'hold' ? 'Hold timer' : 'Camera rep counter'
+  const stateLabel = mode === 'hold' ? (isActive ? 'Hold live' : 'Hold off') : isActive ? 'Camera live' : 'Camera off'
+  const signalLabel = mode === 'hold' ? 'Breath and form' : `${confidence}%`
+  const bodyLabel = mode === 'hold' ? (poseDetected ? 'Position set' : 'Finding position') : poseDetected ? 'Detected' : 'Searching'
+  const statusCopy =
+    mode === 'hold'
+      ? isActive
+        ? 'Hold strong, keep breathing, and stay steady.'
+        : 'This movement uses the timer. Press start when you are ready.'
+      : status
 
   return (
     <div className={className ?? 'rounded-xl bg-card shadow-sm'}>
@@ -420,20 +502,22 @@ export function CameraRepCounter({
             <div className="flex gap-4 items-center">
               <p className="text-sm font-semibold flex items-center gap-2">
                 <Camera className="h-4 w-4 text-primary" />
-                Camera rep counter
+                {timingLabel}
               </p>
-              <p className="font-display text-3xl font-bold text-primary">{repCount}</p>
+              <p className="font-display text-3xl font-bold text-primary">
+                {mode === 'hold' ? `${String(Math.floor(displayValue / 60)).padStart(1, '0')}:${String(displayValue % 60).padStart(2, '0')}` : displayValue}
+              </p>
             </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3 px-2">
             <div className="rounded-lg bg-secondary/50 p-3">
               <p className="text-xs text-muted-foreground">State</p>
-              <p className="font-medium">{isActive ? 'Camera live' : 'Camera off'}</p>
+              <p className="font-medium">{stateLabel}</p>
             </div>
             <div className="rounded-lg bg-secondary/50 p-3">
               <p className="text-xs text-muted-foreground">Signal</p>
-              <p className="font-medium">{`${confidence}%`}</p>
+              <p className="font-medium">{signalLabel}</p>
             </div>
           </div>
 
@@ -444,11 +528,11 @@ export function CameraRepCounter({
             </div>
             <div className="rounded-lg border border-border bg-secondary/30 p-3">
               <p className="text-xs text-muted-foreground">Body</p>
-              <p className="font-medium">{poseDetected ? 'Detected' : 'Searching'}</p>
+              <p className="font-medium">{bodyLabel}</p>
             </div>
           </div>
 
-          <p className="mt-3 text-xs text-muted-foreground px-2">{status}</p>
+          <p className="mt-3 text-xs text-muted-foreground px-2">{statusCopy}</p>
           {error && (
             <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

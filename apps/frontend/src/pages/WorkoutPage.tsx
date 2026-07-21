@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { apiGet, apiPost } from '@/lib/api'
 import { getExerciseMedia } from '@/lib/exerciseMedia'
-import { getCameraTrackingMode } from '@/lib/poseCounter'
+import { getCameraModeLabel, getCameraTrackingMode } from '@/lib/poseCounter'
 import { getCurrentWorkoutPlan, saveWorkoutCompletion } from '@/lib/appState'
 
 interface WorkoutSet {
@@ -630,11 +630,11 @@ export default function WorkoutPage() {
                 </div>
                 {cameraTrackingMode ? (
                   <span className="rounded-full border border-primary/20 bg-background px-3 py-1 text-xs font-medium text-primary">
-                    {cameraTrackingMode.replace(/_/g, ' ')}
+                    {getCameraModeLabel(cameraTrackingMode)}
                   </span>
                 ) : (
                   <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-                    No camera mode
+                    Camera preview only
                   </span>
                 )}
               </div>

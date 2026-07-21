@@ -1,4 +1,4 @@
-export type CameraTrackingMode = 'squat' | 'push_up' | 'curl' | 'sit_up' | 'side_bend'
+export type CameraTrackingMode = 'squat' | 'push_up' | 'curl' | 'sit_up' | 'side_bend' | 'hinge' | 'raise' | 'hold'
 
 export interface PoseLandmark {
   x: number
@@ -47,6 +47,9 @@ const MODE_LABELS: Record<CameraTrackingMode, string> = {
   curl: 'curl',
   sit_up: 'sit-up',
   side_bend: 'side bend',
+  hinge: 'hip hinge',
+  raise: 'shoulder raise',
+  hold: 'timer',
 }
 
 const MODE_HINTS: Record<CameraTrackingMode, string> = {
@@ -55,6 +58,9 @@ const MODE_HINTS: Record<CameraTrackingMode, string> = {
   curl: 'Let the elbows bend fully, then return the arms to the top position.',
   sit_up: 'Curl your torso up, then lower with control.',
   side_bend: 'Lean to the side, then return upright to finish one rep.',
+  hinge: 'Hinge at the hips, then return to a tall standing position.',
+  raise: 'Lift your arms with control, then lower them back down.',
+  hold: 'Use this mode as a timer for holds, cardio, or mobility work.',
 }
 
 export function createRepTrackerState(): RepTrackerState {
@@ -67,13 +73,43 @@ export function createRepTrackerState(): RepTrackerState {
 export function getCameraTrackingMode(exerciseId?: string, exerciseName?: string): CameraTrackingMode | null {
   const key = normalizeExerciseKey(`${exerciseId ?? ''} ${exerciseName ?? ''}`)
 
-  if (/\b(squat|split squat|lunge|step up)\b/.test(key)) return 'squat'
-  if (/\b(push up|pushup|burpee)\b/.test(key)) return 'push_up'
-  if (/\b(curl|bicep|biceps|preacher curl|drag curl|concentration curl)\b/.test(key)) return 'curl'
-  if (/\b(sit up|situp|crunch|knee raise|leg raise|v up|v-up)\b/.test(key)) return 'sit_up'
-  if (/\b(side bend|side crunch|oblique|twist)\b/.test(key)) return 'side_bend'
+  if (/\b(lateral raise|front raise|rear delt raise|face pull|reverse fly|y raise|upright row|shoulder raise)\b/.test(key)) {
+    return 'raise'
+  }
 
-  return null
+  if (/\b(plank|side plank|walk|walking|run|sprint|bike|jump rope|air bike|stationary bike|elliptical|burpee|mountain climber|bear crawl|wheel run|star jump|high knees|stretch|mobility|flexibility|circles|rotation|internal rotation)\b/.test(key)) {
+    return 'hold'
+  }
+
+  const scoredModes: Array<[CameraTrackingMode, number]> = [
+    ['hinge', scoreMatch(key, [
+      /\b(deadlift|romanian deadlift|straight leg deadlift|good morning|hip thrust|glute bridge|bridge|pull through|back extension|hip extension)\b/,
+    ])],
+    ['push_up', scoreMatch(key, [
+      /\b(push up|pushup|bench press|chest dip|dip|overhead press|shoulder press|triceps extension|pushdown|jm bench press|press)\b/,
+    ])],
+    ['raise', scoreMatch(key, [
+      /\b(fly|lateral raise|front raise|rear delt raise|face pull|reverse fly|y raise|upright row)\b/,
+    ])],
+    ['curl', scoreMatch(key, [
+      /\b(curl|bicep|biceps|pulldown|pull up|chin up|row|lat|rear delt row|preacher curl|drag curl|concentration curl)\b/,
+    ])],
+    ['squat', scoreMatch(key, [
+      /\b(squat|split squat|lunge|step up|leg press|calf raise|jump)\b/,
+    ])],
+    ['sit_up', scoreMatch(key, [
+      /\b(sit up|situp|crunch|knee raise|leg raise|v up|v-up|rollout|rollerout|pelvic tilt|reverse crunch|jack knife|hanging knee raise|twist|oblique|pallof|side bend)\b/,
+    ])],
+  ]
+
+  scoredModes.sort((left, right) => right[1] - left[1])
+
+  const [bestMode, bestScore] = scoredModes[0]
+  if (bestScore > 0) {
+    return bestMode
+  }
+
+  return 'hold'
 }
 
 export function getCameraModeLabel(mode: CameraTrackingMode | null) {
@@ -85,6 +121,10 @@ export function getCameraModeHint(mode: CameraTrackingMode | null) {
 }
 
 export function measurePoseValue(mode: CameraTrackingMode, landmarks: PosePoint[]) {
+  if (mode === 'raise') {
+    return getArmLiftValue(landmarks)
+  }
+
   if (mode === 'sit_up') {
     return getTorsoLeanAngle(landmarks)
   }
@@ -224,6 +264,18 @@ function getAnglePairs(mode: CameraTrackingMode): LandmarkPair[] {
         [11, 23, 25],
         [12, 24, 26],
       ]
+    case 'hinge':
+      return [
+        [11, 23, 25],
+        [12, 24, 26],
+      ]
+    case 'raise':
+      return [
+        [11, 13, 15],
+        [12, 14, 16],
+      ]
+    case 'hold':
+      return []
     default:
       return []
   }
@@ -241,9 +293,43 @@ function getThresholds(mode: CameraTrackingMode) {
       return { down: 20, up: 52 }
     case 'side_bend':
       return { down: 130, up: 165 }
+    case 'hinge':
+      return { down: 120, up: 170 }
+    case 'raise':
+      return { down: 55, up: 125 }
+    case 'hold':
+      return { down: 100, up: 160 }
     default:
       return { down: 100, up: 160 }
   }
+}
+
+function getArmLiftValue(landmarks: PosePoint[]) {
+  const leftShoulder = landmarks[11]
+  const rightShoulder = landmarks[12]
+  const leftWrist = landmarks[15]
+  const rightWrist = landmarks[16]
+  const leftHip = landmarks[23]
+  const rightHip = landmarks[24]
+
+  const shoulders = [leftShoulder, rightShoulder].filter(isVisible)
+  const wrists = [leftWrist, rightWrist].filter(isVisible)
+  const hips = [leftHip, rightHip].filter(isVisible)
+
+  if (shoulders.length === 0 || wrists.length === 0) {
+    return null
+  }
+
+  const shoulder = averagePoint(shoulders)
+  const wrist = averagePoint(wrists)
+  const hip = hips.length > 0 ? averagePoint(hips) : { x: shoulder.x, y: shoulder.y + 0.25 }
+  const torsoSpan = Math.max(Math.abs(shoulder.y - hip.y), 0.1)
+  const lift = (shoulder.y - wrist.y) / torsoSpan
+  return Number.isFinite(lift) ? lift * 100 : null
+}
+
+function scoreMatch(key: string, patterns: RegExp[]) {
+  return patterns.reduce((score, pattern) => score + (pattern.test(key) ? 1 : 0), 0)
 }
 
 function getTorsoLeanAngle(landmarks: PosePoint[]) {
