@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import * as helmet from 'helmet'
+import { default as helmet } from 'helmet'
 import morgan from 'morgan'
 import { env } from './config/env.js'
 import { apiRouter } from './routes/index.js'
@@ -11,7 +11,7 @@ export function createApp() {
   const app = express()
   app.set('trust proxy', env.NODE_ENV === 'production')
 
-  app.use(helmet.default())
+  app.use(helmet())
   app.use(
     cors({
       origin: env.NODE_ENV === 'production' ? true : env.FRONTEND_ORIGIN,
