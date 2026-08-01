@@ -57,6 +57,7 @@ interface WorkoutPlan {
 
 type BodyPriority = 'build' | 'balance' | 'reduce'
 type BodyPart = 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Waist' | 'Core' | 'Conditioning' | 'Mobility'
+type ExperienceLevel = UserProfile['experienceLevel']
 
 const BODY_PART_GOAL_MAP: Record<string, BodyPart> = {
   bigger_chest: 'Chest',
@@ -68,6 +69,16 @@ const BODY_PART_GOAL_MAP: Record<string, BodyPart> = {
 
 function hasGoal(goals: string[], keywords: string[]) {
   return goals.some((goal) => keywords.some((keyword) => goal.includes(keyword)))
+}
+
+function getDifficultyScore(difficulty: Exercise['difficulty'], experience: ExperienceLevel) {
+  const ranks: Record<ExperienceLevel, Record<Exercise['difficulty'], number>> = {
+    beginner: { beginner: 0, intermediate: 1, advanced: 2 },
+    intermediate: { intermediate: 0, beginner: 1, advanced: 2 },
+    advanced: { advanced: 0, intermediate: 1, beginner: 2 },
+  }
+
+  return ranks[experience][difficulty]
 }
 
 const GOAL_LABELS: Record<string, string> = {
@@ -519,7 +530,7 @@ function matchesExerciseEquipment(exerciseEquipment: string, equipmentSelection:
   const hasSelection = (...terms: string[]) => selection.some((item) => terms.some((term) => item.includes(term)))
 
   if (normalizedExerciseEquipment === 'bodyweight') return true
-  if (hasSelection('bodyweight')) return true
+  if (hasSelection('bodyweight') && normalizedExerciseEquipment === 'bodyweight') return true
   if (hasSelection('gym access', 'gym')) return true
   if (hasSelection('dumbbell') && normalizedExerciseEquipment === 'dumbbell') return true
   if (hasSelection('barbell') && normalizedExerciseEquipment === 'barbell') return true
@@ -764,7 +775,9 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
       ? [...pool].sort((left, right) => {
           const leftScore = left.equipment === 'bodyweight' ? 0 : left.equipment === 'band' ? 1 : 2
           const rightScore = right.equipment === 'bodyweight' ? 0 : right.equipment === 'band' ? 1 : 2
-          return leftScore - rightScore
+          const equipmentScore = leftScore - rightScore
+          if (equipmentScore !== 0) return equipmentScore
+          return getDifficultyScore(left.difficulty, profile.experienceLevel) - getDifficultyScore(right.difficulty, profile.experienceLevel)
         })
       : pool
     const rotation = orderedPool.length > 1 ? (day - 1) % orderedPool.length : 0

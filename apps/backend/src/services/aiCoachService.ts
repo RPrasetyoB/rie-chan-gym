@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
 import { env } from '../config/env.js'
 import { exerciseCatalog } from '../data/exercises.js'
+import { goalCatalog } from '../data/goals.js'
 import type { PersistedProfile } from './profileDbService.js'
+import { generateWorkoutPlan, type ProfileInput } from './workoutPlanService.js'
 import { COACH_SYSTEM_PROMPT } from './aiCoachPrompt.js'
 
 type CoachMessage = {
@@ -443,7 +445,7 @@ async function generateContent(
       generationConfig: {
         temperature: 0.6,
         topP: 0.95,
-        maxOutputTokens: 768,
+        maxOutputTokens: 1400,
       },
     }),
   })
@@ -500,6 +502,103 @@ function looksWeakRoutineReply(text: string) {
   return !hasStructure || !hasPrescription || !hasExercise
 }
 
+function calculateAge(birthday?: string) {
+  if (!birthday) return 25
+
+  const birthDate = new Date(birthday)
+  if (Number.isNaN(birthDate.getTime())) return 25
+
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthOffset = today.getMonth() - birthDate.getMonth()
+  if (monthOffset < 0 || (monthOffset === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1
+  }
+
+  return Math.min(Math.max(age, 13), 100)
+}
+
+function deriveGoalKeysFromConversation(prompt: string, messages?: CoachMessage[]) {
+  const text = getConversationText(prompt, messages)
+  return goalCatalog
+    .filter((goal) => {
+      const key = goal.key.replace(/_/g, ' ')
+      const title = goal.title.toLowerCase()
+      return text.includes(goal.key) || text.includes(key) || text.includes(title)
+    })
+    .map((goal) => goal.key)
+}
+
+function deriveEquipmentFromConversation(prompt: string, messages?: CoachMessage[]) {
+  const text = getConversationText(prompt, messages)
+  const equipment = [
+    'gym access',
+    'bodyweight',
+    'dumbbell',
+    'barbell',
+    'band',
+    'cable',
+    'leg press machine',
+    'cardio machine',
+    'stationary bike',
+    'elliptical machine',
+    'jump rope',
+  ].filter((item) => text.includes(item))
+
+  if (text.includes('gym') && !equipment.includes('gym access')) {
+    equipment.push('gym access')
+  }
+
+  return equipment
+}
+
+function buildFallbackProfile(prompt: string, messages?: CoachMessage[], context?: CoachContext): ProfileInput {
+  const saved = context?.profile
+  const inferredGoals = deriveGoalKeysFromConversation(prompt, messages)
+  const goals = Array.from(new Set([...(saved?.goals ?? []), ...inferredGoals]))
+  const inferredEquipment = deriveEquipmentFromConversation(prompt, messages)
+
+  return {
+    age: calculateAge(saved?.birthday),
+    gender: saved?.gender ?? 'other',
+    height: saved?.height ?? 170,
+    weight: saved?.weight ?? 70,
+    bodyFat: saved?.bodyFat ?? undefined,
+    goalWeight: saved?.goalWeight ?? undefined,
+    activityLevel: saved?.activityLevel ?? 'light',
+    experienceLevel: saved?.experienceLevel ?? 'beginner',
+    injuries: saved?.injuries ?? undefined,
+    equipment: inferredEquipment.length > 0 ? inferredEquipment : saved?.equipment ?? 'bodyweight',
+    workoutDays: saved?.workoutDays ?? 3,
+    sessionDuration: saved?.sessionDuration ?? 45,
+    goals: goals.length > 0 ? goals : ['general_fitness'],
+  }
+}
+
+function formatWorkoutPlanFallback(profile: ProfileInput) {
+  const plan = generateWorkoutPlan(profile)
+  const days = plan.schedule.map((day) => {
+    const exercises = day.exercises.map((exercise) => {
+      const firstSet = exercise.sets[0]
+      const setCount = exercise.sets.length
+      const setSummary = firstSet
+        ? `${setCount} sets x ${firstSet.reps} reps, ${firstSet.restTime}s rest`
+        : `${setCount} sets`
+
+      return `- ${exercise.name}: ${setSummary}`
+    })
+
+    return [`Day ${day.day} - ${day.focus}`, ...exercises].join('\n')
+  })
+
+  return [
+    `Here is a concrete ${plan.schedule.length}-day workout plan based on your saved profile and this chat:`,
+    '',
+    ...days.flatMap((day) => [day, '']),
+    'Progression: when every set feels clean, add 1-2 reps next time. After you reach the top comfortably, use a slightly harder variation or add a little load.',
+  ].join('\n').trim()
+}
+
 export async function generateCoachReply(prompt: string, messages?: CoachMessage[], context?: CoachContext) {
   if (looksLikePainOrInjuryQuestion(prompt)) {
     return buildSafetyReply(prompt)
@@ -514,6 +613,7 @@ export async function generateCoachReply(prompt: string, messages?: CoachMessage
     throw new Error('Gemini API key is not configured')
   }
 
+  const intent = inferCoachIntent(prompt, messages)
   const cachedContent = await ensurePromptCache().catch(() => null)
   const primaryModel = getModelName()
   const fallbackModel = getFallbackModelName()
@@ -550,15 +650,22 @@ export async function generateCoachReply(prompt: string, messages?: CoachMessage
   }
 
   if (!payload) {
+    if (intent === 'routine') {
+      return formatWorkoutPlanFallback(buildFallbackProfile(prompt, messages, context))
+    }
+
     throw new Error(lastError || 'Gemini request failed')
   }
 
   let text = extractResponseText(payload)
   if (!text) {
+    if (intent === 'routine') {
+      return formatWorkoutPlanFallback(buildFallbackProfile(prompt, messages, context))
+    }
+
     throw new Error('Gemini returned an empty response')
   }
 
-  const intent = inferCoachIntent(prompt, messages)
   const needsConcreteRoutine = intent === 'routine' && looksWeakRoutineReply(text)
 
   if (looksGenericReply(text) || needsConcreteRoutine) {
@@ -600,6 +707,10 @@ export async function generateCoachReply(prompt: string, messages?: CoachMessage
     if (retryText && retryText.length > text.length && !looksIncompleteReply(retryText)) {
       text = retryText
     }
+  }
+
+  if (intent === 'routine' && (looksIncompleteReply(text) || looksWeakRoutineReply(text))) {
+    return formatWorkoutPlanFallback(buildFallbackProfile(prompt, messages, context))
   }
 
   return text

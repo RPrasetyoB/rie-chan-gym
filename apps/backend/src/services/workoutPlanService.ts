@@ -62,6 +62,16 @@ function hasGoal(goals: string[], keywords: string[]) {
   return goals.some((goal) => keywords.some((keyword) => goal.includes(keyword)))
 }
 
+function getDifficultyScore(difficulty: Exercise['difficulty'], experience: ExperienceLevel) {
+  const ranks: Record<ExperienceLevel, Record<Exercise['difficulty'], number>> = {
+    beginner: { beginner: 0, intermediate: 1, advanced: 2 },
+    intermediate: { intermediate: 0, beginner: 1, advanced: 2 },
+    advanced: { advanced: 0, intermediate: 1, beginner: 2 },
+  }
+
+  return ranks[experience][difficulty]
+}
+
 function formatGoalLabel(goalId: string) {
   const goalLabels: Record<string, string> = {
     lose_weight: 'Lose Weight',
@@ -304,7 +314,7 @@ function filterExercises(equipment: string | string[] | undefined, injuries: str
 
     if (equipmentSelection.size === 0 || hasSelection('gym access', 'gym')) return true
     if (exercise.equipment === 'bodyweight') return true
-    if (hasSelection('bodyweight')) return true
+    if (hasSelection('bodyweight') && exercise.equipment === 'bodyweight') return true
     if (hasSelection('dumbbell') && exercise.equipment === 'dumbbell') return true
     if (hasSelection('cable') && exercise.equipment === 'cable') return true
     if (hasSelection('barbell') && exercise.equipment === 'barbell') return true
@@ -527,18 +537,21 @@ function buildDay(day: number, focus: string, categories: string[], profile: Pro
             : ['0003', '3360', '3223', '3637', '0630', '2612', '1160', '0858']
         : []
 
-    const chosen = preferred.length > 0
-      ? preferred
-          .map((id) => categoryExercises.find((exercise) => exercise.id === id))
-          .filter((exercise): exercise is Exercise => Boolean(exercise))
-      : categoryExercises.slice(0, 1)
+    const preferredExercises = preferred
+      .map((id) => categoryExercises.find((exercise) => exercise.id === id))
+      .filter((exercise): exercise is Exercise => Boolean(exercise))
+    const chosen = preferredExercises.length > 0 ? preferredExercises : categoryExercises
     const orderedPool = goalProfile.calisthenics
       ? [...chosen].sort((left, right) => {
           const leftScore = left.equipment === 'bodyweight' ? 0 : left.equipment === 'band' ? 1 : 2
           const rightScore = right.equipment === 'bodyweight' ? 0 : right.equipment === 'band' ? 1 : 2
-          return leftScore - rightScore
+          const equipmentScore = leftScore - rightScore
+          if (equipmentScore !== 0) return equipmentScore
+          return getDifficultyScore(left.difficulty, profile.experienceLevel) - getDifficultyScore(right.difficulty, profile.experienceLevel)
         })
       : chosen
+    const rotation = orderedPool.length > 1 ? (day - 1) % orderedPool.length : 0
+    const rotatedPool = orderedPool.slice(rotation).concat(orderedPool.slice(0, rotation))
 
     const maxForCategory =
       goalProfile.bodyPartTargets.includes(category as BodyPart)
@@ -553,7 +566,7 @@ function buildDay(day: number, focus: string, categories: string[], profile: Pro
               ? 2
               : 1
 
-    orderedPool.slice(0, maxForCategory).forEach((exercise) => {
+    rotatedPool.slice(0, maxForCategory).forEach((exercise) => {
       if (!exercise || selectedExercises.has(exercise.id)) return
 
       selectedExercises.set(exercise.id, {
