@@ -4,6 +4,7 @@ import { requireAuth, type AuthenticatedRequest } from '../middleware/requireAut
 import { AppError } from '../lib/http.js'
 import { consumeDailyChatSlot } from '../services/aiChatQuota.js'
 import { analyzeProgress, generateCoachReply, modifyWorkout, nutritionAdvice, recoveryAdvice } from '../services/aiCoachService.js'
+import { getProfileForUser } from '../services/profileDbService.js'
 
 export const aiRouter = Router()
 
@@ -23,7 +24,8 @@ aiRouter.post('/chat', async (req: AuthenticatedRequest, res, next) => {
   try {
     const { prompt, messages } = chatSchema.parse(req.body)
     await consumeDailyChatSlot(req)
-    const reply = await generateCoachReply(prompt, messages)
+    const profile = await getProfileForUser(req.user!.id)
+    const reply = await generateCoachReply(prompt, messages, { profile })
     res.json({
       reply,
       available: true,

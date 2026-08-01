@@ -74,6 +74,7 @@ const GOAL_LABELS: Record<string, string> = {
   lose_weight: 'Lose Weight',
   build_muscle: 'Build Muscle',
   strength: 'Strength',
+  calisthenics: 'Calisthenics',
   bigger_chest: 'Bigger Chest',
   bigger_arms: 'Bigger Arms',
   bigger_shoulders: 'Bigger Shoulders',
@@ -107,6 +108,7 @@ function getGoalProfile(goals: string[]) {
 
   return {
     strength: hasGoal(goals, ['strength', 'build_muscle']),
+    calisthenics: hasGoal(goals, ['calisthenics']),
     conditioning: hasGoal(goals, ['endurance', 'cardiovascular', 'lose_weight', 'fat_loss', 'improve_stamina']),
     mobility: hasGoal(goals, ['mobility', 'flexibility', 'hip_mobility']),
     posture: hasGoal(goals, ['better_posture']),
@@ -146,6 +148,10 @@ function getGoalDriversForFocus(goals: string[], focus: string, categories: stri
 
   if (goalProfile.strength && hasUpperOrLower) {
     addGoals(['strength', 'build_muscle', 'general_fitness'])
+  }
+
+  if (goalProfile.calisthenics && hasUpperOrLower) {
+    addGoals(['calisthenics', 'general_fitness', 'strength'])
   }
 
   if (goalProfile.conditioning && hasConditioning) {
@@ -576,6 +582,7 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
       }
       return lowerEmphasis
     }
+    if (goalProfile.calisthenics) return ['Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Legs']
     if (goalProfile.mobility) return ['Mobility', 'Waist', 'Legs', 'Back']
     if (goalProfile.posture) return ['Back', 'Shoulders', 'Waist', 'Mobility']
     if (goalProfile.core) return ['Waist', 'Legs', 'Back', 'Mobility']
@@ -593,6 +600,9 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
       return lowerEmphasis
     }
     const upper = day % 2 === 1
+    if (goalProfile.calisthenics) {
+      return upper ? ['Chest', 'Back', 'Shoulders', 'Arms', 'Core'] : ['Legs', 'Core', 'Mobility']
+    }
     if (goalProfile.mobility) {
       return upper ? ['Mobility', 'Back', 'Shoulders', 'Waist'] : ['Legs', 'Mobility', 'Waist']
     }
@@ -620,6 +630,11 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
       return phase === 1 || phase === 2 ? upperEmphasis : ['Arms', 'Chest', 'Back', 'Shoulders']
     }
     return lowerEmphasis
+  }
+  if (goalProfile.calisthenics) {
+    if (phase === 1) return ['Chest', 'Core', 'Shoulders']
+    if (phase === 2) return ['Back', 'Arms', 'Core']
+    return ['Legs', 'Core', 'Mobility']
   }
   if (goalProfile.mobility) {
     if (phase === 1) return ['Mobility', 'Waist', 'Shoulders']
@@ -709,11 +724,21 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
   const goalProfile = getGoalProfile(profile.goals)
   const bodyStatus = getBodyStatus(profile)
   const categoryPreferences: Record<string, string[]> = {
-    Chest: ['barbell_bench_press', 'barbell_decline_bench_press', '0047', '0122', '0151', '0169', '0171', 'assisted_chest_dip_kneeling', 'assisted_wide_grip_chest_dip_kneeling', 'band_bench_press', 'band_one_arm_twisting_chest_press', 'archer_push_up'],
-    Back: ['alternate_lateral_pulldown', '0970', '0974', '0983', '0027', '3017', 'assisted_parallel_close_grip_pull_up', 'assisted_pull_up', 'band_assisted_pull_up', 'band_close_grip_pulldown', 'band_kneeling_one_arm_pulldown', 'archer_pull_up', 'band_shrug'],
-    Shoulders: ['0978', '1012', '1017', '0076', '0148', 'band_front_lateral_raise', 'band_reverse_fly', 'band_shoulder_press', 'band_standing_rear_delt_row', 'barbell_rear_delt_raise', 'barbell_upright_row', 'cable_lateral_raise', 'cable_shoulder_press', 'dumbbell_reverse_fly', 'dumbbell_seated_shoulder_press'],
-    Arms: ['barbell_alternate_biceps_curl', 'barbell_curl', 'barbell_drag_curl', '0052', '0061', 'barbell_preacher_curl', '0968', '0976', '0986', 'barbell_reverse_curl', 'assisted_triceps_dip_kneeling', 'assisted_standing_triceps_extension_with_towel', 'band_close_grip_push_up', 'band_side_triceps_extension', 'barbell_close_grip_bench_press', 'barbell_jm_bench_press'],
-    Legs: ['barbell_full_squat', 'barbell_front_squat', 'barbell_one_leg_squat', 'barbell_straight_leg_deadlift', 'barbell_good_morning', '0032', 'backward_jump', '0980', '0987', '0991', '1008', 'band_step_up', 'band_single_leg_split_squat', 'barbell_glute_bridge', 'low_glute_bridge_on_floor', 'resistance_band_hip_thrusts_on_knees', 'single_leg_bridge_with_outstretched_leg', 'side_hip_abduction'],
+    Chest: goalProfile.calisthenics
+      ? ['push_up', 'assisted_chest_dip_kneeling', 'assisted_wide_grip_chest_dip_kneeling', 'archer_push_up', 'band_close_grip_push_up', 'band_one_arm_twisting_chest_press', 'band_bench_press', 'barbell_bench_press', 'barbell_decline_bench_press', '0047', '0122', '0151', '0169', '0171']
+      : ['barbell_bench_press', 'barbell_decline_bench_press', '0047', '0122', '0151', '0169', '0171', 'assisted_chest_dip_kneeling', 'assisted_wide_grip_chest_dip_kneeling', 'band_bench_press', 'band_one_arm_twisting_chest_press', 'archer_push_up'],
+    Back: goalProfile.calisthenics
+      ? ['pull_up', 'assisted_pull_up', 'assisted_parallel_close_grip_pull_up', 'archer_pull_up', 'band_assisted_pull_up', 'band_close_grip_pulldown', 'band_kneeling_one_arm_pulldown', 'alternate_lateral_pulldown', '0970', '0974', '0983', '0027', '3017', 'band_shrug']
+      : ['alternate_lateral_pulldown', '0970', '0974', '0983', '0027', '3017', 'assisted_parallel_close_grip_pull_up', 'assisted_pull_up', 'band_assisted_pull_up', 'band_close_grip_pulldown', 'band_kneeling_one_arm_pulldown', 'archer_pull_up', 'band_shrug'],
+    Shoulders: goalProfile.calisthenics
+      ? ['band_shoulder_press', 'band_front_lateral_raise', 'band_reverse_fly', 'band_standing_rear_delt_row', '0978', '1012', '1017', '0076', '0148', 'barbell_rear_delt_raise', 'barbell_upright_row', 'cable_lateral_raise', 'cable_shoulder_press', 'dumbbell_reverse_fly', 'dumbbell_seated_shoulder_press']
+      : ['0978', '1012', '1017', '0076', '0148', 'band_front_lateral_raise', 'band_reverse_fly', 'band_shoulder_press', 'band_standing_rear_delt_row', 'barbell_rear_delt_raise', 'barbell_upright_row', 'cable_lateral_raise', 'cable_shoulder_press', 'dumbbell_reverse_fly', 'dumbbell_seated_shoulder_press'],
+    Arms: goalProfile.calisthenics
+      ? ['assisted_triceps_dip_kneeling', 'band_close_grip_push_up', 'band_side_triceps_extension', 'assisted_standing_triceps_extension_with_towel', 'barbell_alternate_biceps_curl', 'barbell_curl', 'barbell_drag_curl', '0052', '0061', 'barbell_preacher_curl', '0968', '0976', '0986', 'barbell_reverse_curl', 'barbell_close_grip_bench_press', 'barbell_jm_bench_press']
+      : ['barbell_alternate_biceps_curl', 'barbell_curl', 'barbell_drag_curl', '0052', '0061', 'barbell_preacher_curl', '0968', '0976', '0986', 'barbell_reverse_curl', 'assisted_triceps_dip_kneeling', 'assisted_standing_triceps_extension_with_towel', 'band_close_grip_push_up', 'band_side_triceps_extension', 'barbell_close_grip_bench_press', 'barbell_jm_bench_press'],
+    Legs: goalProfile.calisthenics
+      ? ['calf_raise', 'lunge', 'backward_jump', 'band_step_up', 'band_single_leg_split_squat', '1473', 'low_glute_bridge_on_floor', 'glute_bridge_march', 'single_leg_bridge_with_outstretched_leg', 'side_hip_abduction', 'barbell_full_squat', 'barbell_front_squat', 'barbell_one_leg_squat', 'barbell_straight_leg_deadlift', 'barbell_good_morning', '0032', '0980', '0987', '0991', '1008', 'barbell_glute_bridge', 'resistance_band_hip_thrusts_on_knees']
+      : ['barbell_full_squat', 'barbell_front_squat', 'barbell_one_leg_squat', 'barbell_straight_leg_deadlift', 'barbell_good_morning', '0032', 'backward_jump', '0980', '0987', '0991', '1008', 'band_step_up', 'band_single_leg_split_squat', 'barbell_glute_bridge', 'low_glute_bridge_on_floor', 'resistance_band_hip_thrusts_on_knees', 'single_leg_bridge_with_outstretched_leg', 'side_hip_abduction'],
     Waist: ['0001', '0002', '0006', '0011', '0014', '0969', '0971', '0972', '0979', '0981', '0985', '0992', '1005', '1011', '1014', '0071', '0084', '0094', '0103', '0112', '3544', '2466', '0873', '0211', '0212', '2399', '0222', '0223', '0226', '0874', '0230', '0242', '0243', '0862', '2963', '0262', '0267', '3204', '2333', '2355'],
     Conditioning: ['0003', '3360', '3223', '3637', '0630', '2612', '1160', '0858'],
   }
@@ -735,8 +760,15 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
       .filter((exercise): exercise is Exercise => Boolean(exercise))
 
     const pool = preferredExercises.length > 0 ? preferredExercises : categoryExercises
-    const rotation = pool.length > 1 ? (day - 1) % pool.length : 0
-    const rotatedPool = pool.slice(rotation).concat(pool.slice(0, rotation))
+    const orderedPool = goalProfile.calisthenics
+      ? [...pool].sort((left, right) => {
+          const leftScore = left.equipment === 'bodyweight' ? 0 : left.equipment === 'band' ? 1 : 2
+          const rightScore = right.equipment === 'bodyweight' ? 0 : right.equipment === 'band' ? 1 : 2
+          return leftScore - rightScore
+        })
+      : pool
+    const rotation = orderedPool.length > 1 ? (day - 1) % orderedPool.length : 0
+    const rotatedPool = orderedPool.slice(rotation).concat(orderedPool.slice(0, rotation))
 
   const maxForCategory =
       goalProfile.bodyPartTargets.includes(category as BodyPart)

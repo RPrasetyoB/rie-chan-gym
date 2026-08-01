@@ -4,6 +4,7 @@ import type { ActivityLevel, ExperienceLevel, Gender } from '../types/domain.js'
 
 type BodyPriority = 'build' | 'balance' | 'reduce'
 type BodyPart = 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Waist' | 'Core' | 'Conditioning' | 'Mobility'
+type Exercise = (typeof exerciseCatalog)[number]
 
 const BODY_PART_GOAL_MAP: Record<string, BodyPart> = {
   bigger_chest: 'Chest',
@@ -66,6 +67,7 @@ function formatGoalLabel(goalId: string) {
     lose_weight: 'Lose Weight',
     build_muscle: 'Build Muscle',
     strength: 'Strength',
+    calisthenics: 'Calisthenics',
     bigger_chest: 'Bigger Chest',
     bigger_arms: 'Bigger Arms',
     bigger_shoulders: 'Bigger Shoulders',
@@ -98,6 +100,7 @@ function getGoalProfile(goals: string[]) {
 
   return {
     strength: hasGoal(goals, ['strength', 'build_muscle']),
+    calisthenics: hasGoal(goals, ['calisthenics']),
     conditioning: hasGoal(goals, ['endurance', 'cardiovascular', 'lose_weight', 'fat_loss', 'improve_stamina']),
     mobility: hasGoal(goals, ['mobility', 'flexibility', 'hip_mobility']),
     posture: hasGoal(goals, ['better_posture']),
@@ -140,6 +143,10 @@ function getGoalDriversForFocus(goals: string[], focus: string, categories: stri
 
   if (goalProfile.strength && hasUpperOrLower) {
     addGoals(['strength', 'build_muscle', 'general_fitness'])
+  }
+
+  if (goalProfile.calisthenics && hasUpperOrLower) {
+    addGoals(['calisthenics', 'general_fitness', 'strength'])
   }
 
   if (goalProfile.conditioning && hasConditioning) {
@@ -338,6 +345,7 @@ function getPreferredCategories(profile: ProfileInput, split: string, day: numbe
       }
       return lowerEmphasis
     }
+    if (goalProfile.calisthenics) return ['Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Legs']
     if (goalProfile.mobility) return ['Mobility', 'Waist', 'Legs', 'Back']
     if (goalProfile.posture) return ['Back', 'Shoulders', 'Waist', 'Mobility']
     if (goalProfile.core) return ['Waist', 'Legs', 'Back', 'Mobility']
@@ -355,6 +363,9 @@ function getPreferredCategories(profile: ProfileInput, split: string, day: numbe
       return lowerEmphasis
     }
     const upper = day % 2 === 1
+    if (goalProfile.calisthenics) {
+      return upper ? ['Chest', 'Back', 'Shoulders', 'Arms', 'Core'] : ['Legs', 'Core', 'Mobility']
+    }
     if (goalProfile.mobility) {
       return upper ? ['Mobility', 'Back', 'Shoulders', 'Waist'] : ['Legs', 'Mobility', 'Waist']
     }
@@ -382,6 +393,11 @@ function getPreferredCategories(profile: ProfileInput, split: string, day: numbe
       return phase === 1 || phase === 2 ? upperEmphasis : ['Arms', 'Chest', 'Back', 'Shoulders']
     }
     return lowerEmphasis
+  }
+  if (goalProfile.calisthenics) {
+    if (phase === 1) return ['Chest', 'Core', 'Shoulders']
+    if (phase === 2) return ['Back', 'Arms', 'Core']
+    return ['Legs', 'Core', 'Mobility']
   }
   if (goalProfile.mobility) {
     if (phase === 1) return ['Mobility', 'Waist', 'Shoulders']
@@ -514,8 +530,15 @@ function buildDay(day: number, focus: string, categories: string[], profile: Pro
     const chosen = preferred.length > 0
       ? preferred
           .map((id) => categoryExercises.find((exercise) => exercise.id === id))
-          .filter(Boolean)
+          .filter((exercise): exercise is Exercise => Boolean(exercise))
       : categoryExercises.slice(0, 1)
+    const orderedPool = goalProfile.calisthenics
+      ? [...chosen].sort((left, right) => {
+          const leftScore = left.equipment === 'bodyweight' ? 0 : left.equipment === 'band' ? 1 : 2
+          const rightScore = right.equipment === 'bodyweight' ? 0 : right.equipment === 'band' ? 1 : 2
+          return leftScore - rightScore
+        })
+      : chosen
 
     const maxForCategory =
       goalProfile.bodyPartTargets.includes(category as BodyPart)
@@ -530,7 +553,7 @@ function buildDay(day: number, focus: string, categories: string[], profile: Pro
               ? 2
               : 1
 
-    chosen.slice(0, maxForCategory).forEach((exercise) => {
+    orderedPool.slice(0, maxForCategory).forEach((exercise) => {
       if (!exercise || selectedExercises.has(exercise.id)) return
 
       selectedExercises.set(exercise.id, {

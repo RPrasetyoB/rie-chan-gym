@@ -2,6 +2,7 @@ export const goalCatalog = [
   { key: 'lose_weight', title: 'Lose Weight' },
   { key: 'build_muscle', title: 'Build Muscle' },
   { key: 'strength', title: 'Strength' },
+  { key: 'calisthenics', title: 'Calisthenics' },
   { key: 'bigger_chest', title: 'Bigger Chest' },
   { key: 'bigger_arms', title: 'Bigger Arms' },
   { key: 'bigger_shoulders', title: 'Bigger Shoulders' },

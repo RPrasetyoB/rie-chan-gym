@@ -10,6 +10,7 @@ const GOALS = [
   { id: 'lose_weight', label: 'Lose Weight', icon: '🔥' },
   { id: 'build_muscle', label: 'Build Muscle', icon: '💪' },
   { id: 'strength', label: 'Strength', icon: '🏋️' },
+  { id: 'calisthenics', label: 'Calisthenics', icon: '🤸' },
   { id: 'bigger_chest', label: 'Bigger Chest', icon: '胸' },
   { id: 'bigger_arms', label: 'Bigger Arms', icon: '💪' },
   { id: 'bigger_shoulders', label: 'Bigger Shoulders', icon: '🧱' },
@@ -35,8 +36,13 @@ export default function OnboardingGoalsPage() {
   const focusSummary = [
     {
       title: 'Strength focus',
-      matches: ['strength', 'build_muscle', 'general_fitness'],
+      matches: ['strength', 'build_muscle', 'general_fitness', 'calisthenics'],
       description: 'Compound lifts, progressive overload, and higher training density.',
+    },
+    {
+      title: 'Calisthenics focus',
+      matches: ['calisthenics'],
+      description: 'Bodyweight progressions, pull-up practice, push-up volume, and core control.',
     },
     {
       title: 'Muscle growth focus',
