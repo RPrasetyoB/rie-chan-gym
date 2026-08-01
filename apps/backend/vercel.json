@@ -1,6 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/v1/keepalive",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "routes": [
     {
       "src": "/(.*)",

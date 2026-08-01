@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,7 +8,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
-import { saveOnboardingProfile } from '@/lib/onboardingStorage'
+import { apiGet } from '@/lib/api'
+import { loadOnboardingState, normalizeEquipmentSelection, saveOnboardingProfile } from '@/lib/onboardingStorage'
+
+const EQUIPMENT_OPTIONS = [
+  { value: 'gym access', label: 'Gym access' },
+  { value: 'bodyweight', label: 'Bodyweight' },
+  { value: 'dumbbell', label: 'Dumbbell' },
+  { value: 'barbell', label: 'Barbell' },
+  { value: 'band', label: 'Band' },
+  { value: 'cable', label: 'Cable' },
+  { value: 'leg press machine', label: 'Leg press machine' },
+  { value: 'cardio machine', label: 'Cardio machine' },
+  { value: 'stationary bike', label: 'Stationary bike' },
+  { value: 'elliptical machine', label: 'Elliptical machine' },
+  { value: 'rope', label: 'Jump rope' },
+] as const
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -20,32 +36,93 @@ const profileSchema = z.object({
   activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']),
   experienceLevel: z.enum(['beginner', 'intermediate', 'advanced']),
   injuries: z.string().optional(),
-  equipment: z.string().optional(),
+  equipment: z.array(z.string()).default([]),
   workoutDays: z.number().min(1).max(7),
   sessionDuration: z.number().min(15).max(180),
 })
 
 type ProfileFormData = z.infer<typeof profileSchema>
 
+type RemoteProfileResponse = {
+  profile:
+    | (Omit<Partial<ProfileFormData>, 'equipment'> & {
+        name?: string
+        equipment?: string | string[]
+      })
+    | null
+}
+
+function getProfileDefaultValues(profile?: Partial<ProfileFormData>): ProfileFormData {
+  return {
+    name: profile?.name ?? '',
+    birthday: profile?.birthday ?? '',
+    gender: profile?.gender ?? 'male',
+    height: profile?.height ?? 170,
+    weight: profile?.weight ?? 70,
+    bodyFat: profile?.bodyFat,
+    goalWeight: profile?.goalWeight,
+    activityLevel: profile?.activityLevel ?? 'moderate',
+    experienceLevel: profile?.experienceLevel ?? 'beginner',
+    injuries: profile?.injuries ?? '',
+    equipment: normalizeEquipmentSelection(profile?.equipment ?? ''),
+    workoutDays: profile?.workoutDays ?? 3,
+    sessionDuration: profile?.sessionDuration ?? 45,
+  }
+}
+
 export default function OnboardingProfilePage() {
   const navigate = useNavigate()
+  const [savedProfile] = useState(() => loadOnboardingState().profile)
+  const defaultValues = useMemo(() => getProfileDefaultValues(savedProfile), [savedProfile])
   const {
     register,
     handleSubmit,
+    reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      activityLevel: 'moderate',
-      experienceLevel: 'beginner',
-      workoutDays: 3,
-      sessionDuration: 45,
-    },
+    defaultValues,
   })
+  const selectedEquipment = watch('equipment') ?? []
+
+  useEffect(() => {
+    let isMounted = true
+
+    const hydrateProfile = async () => {
+      try {
+        const response = await apiGet<RemoteProfileResponse>('/profile')
+        if (!isMounted || !response.profile) return
+
+        reset({
+          ...defaultValues,
+          ...response.profile,
+          equipment: normalizeEquipmentSelection(response.profile.equipment ?? ''),
+        })
+      } catch {
+        // Keep local defaults when the backend profile is unavailable.
+      }
+    }
+
+    hydrateProfile()
+
+    return () => {
+      isMounted = false
+    }
+  }, [defaultValues, reset])
 
   const onSubmit = async (data: ProfileFormData) => {
     saveOnboardingProfile(data)
     navigate('/onboarding/goals')
+  }
+
+  const toggleEquipment = (equipment: string) => {
+    const next = selectedEquipment.includes(equipment)
+      ? selectedEquipment.filter((item) => item !== equipment)
+      : [...selectedEquipment, equipment]
+
+    setValue('equipment', next, { shouldDirty: true, shouldTouch: true })
   }
 
   return (
@@ -137,22 +214,26 @@ export default function OnboardingProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bodyFat">Body Fat % (optional)</Label>
-                  <Input
-                    id="bodyFat"
-                    type="number"
-                    placeholder="15"
-                    {...register('bodyFat', { valueAsNumber: true })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="goalWeight">Goal Weight (kg) (optional)</Label>
-                  <Input
-                    id="goalWeight"
-                    type="number"
-                    placeholder="65"
-                    {...register('goalWeight', { valueAsNumber: true })}
-                  />
-                </div>
+                <Input
+                  id="bodyFat"
+                  type="number"
+                  placeholder="15"
+                  {...register('bodyFat', {
+                    setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                  })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="goalWeight">Goal Weight (kg) (optional)</Label>
+                <Input
+                  id="goalWeight"
+                  type="number"
+                  placeholder="65"
+                  {...register('goalWeight', {
+                    setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                  })}
+                />
+              </div>
               </div>
 
               <div className="space-y-2">
@@ -193,12 +274,34 @@ export default function OnboardingProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="equipment">Available Equipment (optional)</Label>
-                <Input
-                  id="equipment"
-                  placeholder="e.g., gym access, dumbbells, bodyweight only"
-                  {...register('equipment')}
-                />
+                <Label>Available Equipment (optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Select every tool you can use so your workout suggestions stay realistic.
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {EQUIPMENT_OPTIONS.map((equipment) => {
+                    const checked = selectedEquipment.includes(equipment.value)
+                    return (
+                      <label
+                        key={equipment.value}
+                        className={[
+                          'flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors',
+                          checked
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        ].join(' ')}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleEquipment(equipment.value)}
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                        />
+                        <span>{equipment.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

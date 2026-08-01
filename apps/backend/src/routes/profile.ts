@@ -16,7 +16,7 @@ const profileSchema = z.object({
   activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']),
   experienceLevel: z.enum(['beginner', 'intermediate', 'advanced']),
   injuries: z.string().optional(),
-  equipment: z.string().optional(),
+  equipment: z.union([z.string(), z.array(z.string())]).optional(),
   workoutDays: z.number().min(1).max(7),
   sessionDuration: z.number().min(15).max(180),
   goals: z.array(z.string()).default([]),

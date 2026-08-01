@@ -10,6 +10,11 @@ const GOALS = [
   { id: 'lose_weight', label: 'Lose Weight', icon: '🔥' },
   { id: 'build_muscle', label: 'Build Muscle', icon: '💪' },
   { id: 'strength', label: 'Strength', icon: '🏋️' },
+  { id: 'bigger_chest', label: 'Bigger Chest', icon: '胸' },
+  { id: 'bigger_arms', label: 'Bigger Arms', icon: '💪' },
+  { id: 'bigger_shoulders', label: 'Bigger Shoulders', icon: '🧱' },
+  { id: 'wider_back', label: 'Wider Back', icon: '🪽' },
+  { id: 'bigger_legs', label: 'Bigger Legs', icon: '🦵' },
   { id: 'fat_loss', label: 'Fat Loss', icon: '⚡' },
   { id: 'endurance', label: 'Endurance', icon: '🏃' },
   { id: 'mobility', label: 'Mobility', icon: '🤸' },
@@ -32,6 +37,11 @@ export default function OnboardingGoalsPage() {
       title: 'Strength focus',
       matches: ['strength', 'build_muscle', 'general_fitness'],
       description: 'Compound lifts, progressive overload, and higher training density.',
+    },
+    {
+      title: 'Muscle growth focus',
+      matches: ['bigger_chest', 'bigger_arms', 'bigger_shoulders', 'wider_back', 'bigger_legs'],
+      description: 'Adds more volume and more direct work for the muscle group you want to grow.',
     },
     {
       title: 'Conditioning focus',

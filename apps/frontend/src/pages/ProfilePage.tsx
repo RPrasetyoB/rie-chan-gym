@@ -4,9 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/theme-provider'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
-import { calculateAgeFromBirthday, clearOnboardingState, loadOnboardingState } from '@/lib/onboardingStorage'
+import { calculateAgeFromBirthday, clearOnboardingState, loadOnboardingState, normalizeEquipmentSelection } from '@/lib/onboardingStorage'
 import { clearAuthSession, loadAuthSession } from '@/lib/appState'
 import { apiPost, clearAuthTokens } from '@/lib/api'
+
+function formatEquipmentLabel(value: string) {
+  return value
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/\bAccess\b/, 'Access')
+}
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -66,7 +72,9 @@ export default function ProfilePage() {
                 {profile?.name || authSession?.name || 'Your Profile'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {profile?.equipment || authSession?.email || 'Workout setup not saved yet'}
+                {normalizeEquipmentSelection(profile?.equipment).map(formatEquipmentLabel).join(', ') ||
+                  authSession?.email ||
+                  'Workout setup not saved yet'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {age ? `Age ${age}` : 'Member since Jan 2024'}

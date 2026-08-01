@@ -9,7 +9,7 @@ export interface OnboardingProfileData {
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
   experienceLevel: 'beginner' | 'intermediate' | 'advanced'
   injuries?: string
-  equipment?: string
+  equipment?: string[]
   workoutDays: number
   sessionDuration: number
 }
@@ -24,6 +24,24 @@ const STORAGE_KEY = 'rie-chan-onboarding'
 
 function isClient() {
   return typeof window !== 'undefined'
+}
+
+export function normalizeEquipmentSelection(equipment?: string | string[] | null) {
+  const rawValues = Array.isArray(equipment)
+    ? equipment
+    : typeof equipment === 'string'
+      ? equipment.split(/[,;|\n]/g)
+      : []
+
+  const selection = new Set<string>()
+
+  rawValues.forEach((entry) => {
+    const normalized = entry.toLowerCase().trim()
+    if (!normalized) return
+    selection.add(normalized)
+  })
+
+  return Array.from(selection)
 }
 
 export function loadOnboardingState(): OnboardingState {

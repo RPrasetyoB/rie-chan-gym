@@ -19,12 +19,45 @@ export interface PersistedProfile {
   goals: string[]
 }
 
-export interface ProfileUpsertInput extends Omit<PersistedProfile, 'name'> {
+export interface ProfileUpsertInput {
+  birthday: string
+  gender: 'male' | 'female' | 'other'
+  height: number
+  weight: number
+  bodyFat?: number | null
+  goalWeight?: number | null
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+  experienceLevel: 'beginner' | 'intermediate' | 'advanced'
+  injuries?: string | null
+  equipment?: string | string[] | null
+  workoutDays: number
+  sessionDuration: number
   goals: string[]
 }
 
 function formatDate(value: Date) {
   return value.toISOString().slice(0, 10)
+}
+
+function serializeEquipment(equipment?: string | string[] | null) {
+  if (!equipment) return null
+  if (Array.isArray(equipment)) {
+    const cleaned = Array.from(
+      new Set(
+        equipment
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0),
+      ),
+    )
+    return cleaned.length > 0 ? cleaned.join(', ') : null
+  }
+
+  const cleaned = equipment
+    .split(/[,;|\n]/g)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)).join(', ') : null
 }
 
 async function ensureGoal(tx: Prisma.TransactionClient, goalKey: string) {
@@ -92,7 +125,7 @@ export async function upsertProfileForUser(userId: string, input: ProfileUpsertI
         activityLevel: input.activityLevel,
         experienceLevel: input.experienceLevel,
         injuries: input.injuries ?? null,
-        equipment: input.equipment ?? null,
+        equipment: serializeEquipment(input.equipment),
         workoutDays: input.workoutDays,
         sessionDuration: input.sessionDuration,
       },
@@ -107,7 +140,7 @@ export async function upsertProfileForUser(userId: string, input: ProfileUpsertI
         activityLevel: input.activityLevel,
         experienceLevel: input.experienceLevel,
         injuries: input.injuries ?? null,
-        equipment: input.equipment ?? null,
+        equipment: serializeEquipment(input.equipment),
         workoutDays: input.workoutDays,
         sessionDuration: input.sessionDuration,
       },

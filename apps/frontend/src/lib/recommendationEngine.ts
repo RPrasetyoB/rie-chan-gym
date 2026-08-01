@@ -11,7 +11,7 @@ interface UserProfile {
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
   experienceLevel: 'beginner' | 'intermediate' | 'advanced'
   injuries?: string
-  equipment?: string
+  equipment?: string | string[]
   workoutDays: number
   sessionDuration: number
   goals: string[]
@@ -56,6 +56,15 @@ interface WorkoutPlan {
 }
 
 type BodyPriority = 'build' | 'balance' | 'reduce'
+type BodyPart = 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Waist' | 'Core' | 'Conditioning' | 'Mobility'
+
+const BODY_PART_GOAL_MAP: Record<string, BodyPart> = {
+  bigger_chest: 'Chest',
+  bigger_arms: 'Arms',
+  bigger_shoulders: 'Shoulders',
+  wider_back: 'Back',
+  bigger_legs: 'Legs',
+}
 
 function hasGoal(goals: string[], keywords: string[]) {
   return goals.some((goal) => keywords.some((keyword) => goal.includes(keyword)))
@@ -65,6 +74,11 @@ const GOAL_LABELS: Record<string, string> = {
   lose_weight: 'Lose Weight',
   build_muscle: 'Build Muscle',
   strength: 'Strength',
+  bigger_chest: 'Bigger Chest',
+  bigger_arms: 'Bigger Arms',
+  bigger_shoulders: 'Bigger Shoulders',
+  wider_back: 'Wider Back',
+  bigger_legs: 'Bigger Legs',
   fat_loss: 'Fat Loss',
   endurance: 'Endurance',
   mobility: 'Mobility',
@@ -83,12 +97,22 @@ export function formatGoalLabel(goalId: string) {
 }
 
 function getGoalProfile(goals: string[]) {
+  const bodyPartTargets = Array.from(
+    new Set(
+      goals
+        .map((goal) => BODY_PART_GOAL_MAP[goal])
+        .filter((bodyPart): bodyPart is BodyPart => Boolean(bodyPart)),
+    ),
+  )
+
   return {
     strength: hasGoal(goals, ['strength', 'build_muscle']),
     conditioning: hasGoal(goals, ['endurance', 'cardiovascular', 'lose_weight', 'fat_loss', 'improve_stamina']),
     mobility: hasGoal(goals, ['mobility', 'flexibility', 'hip_mobility']),
     posture: hasGoal(goals, ['better_posture']),
     core: hasGoal(goals, ['core_strength', 'pelvic_floor']),
+    bodyPartTargets,
+    wantsBodyPartHypertrophy: bodyPartTargets.length > 0,
   }
 }
 
@@ -139,6 +163,15 @@ function getGoalDriversForFocus(goals: string[], focus: string, categories: stri
   if (goalProfile.core && (hasCore || hasMobility || categories.includes('Legs'))) {
     addGoals(['core_strength', 'pelvic_floor'])
   }
+
+  goalProfile.bodyPartTargets.forEach((bodyPart) => {
+    if (categories.includes(bodyPart)) {
+      const goalKey = Object.entries(BODY_PART_GOAL_MAP).find(([, mappedBodyPart]) => mappedBodyPart === bodyPart)?.[0]
+      if (goalKey) {
+        addGoals([goalKey])
+      }
+    }
+  })
 
   if (drivers.size === 0) {
     goals.forEach((goal) => drivers.add(formatGoalLabel(goal)))
@@ -402,6 +435,12 @@ function getSetCount(experience: string, goals: string[], bodyStatus: BMIStatus)
     return 4
   }
 
+  if (goalProfile.wantsBodyPartHypertrophy) {
+    if (experience === 'beginner') return 3
+    if (experience === 'intermediate') return 4
+    return bodyStatus === 'underweight' ? 5 : 4
+  }
+
   if (goalProfile.strength || goalProfile.conditioning) {
     if (experience === 'beginner') return 3
     if (experience === 'intermediate') return 4
@@ -450,20 +489,55 @@ function determineSplit(workoutDays: number): string {
   return 'full_body'
 }
 
-function filterExercisesByEquipment(exercises: Exercise[], equipment: string): Exercise[] {
-  if (!equipment || equipment.toLowerCase().includes('gym')) {
+function normalizeEquipmentSelection(equipment?: string | string[]) {
+  const rawValues = Array.isArray(equipment)
+    ? equipment
+    : typeof equipment === 'string'
+      ? equipment.split(/[,;|\n]/g)
+      : []
+
+  const selection = new Set<string>()
+
+  rawValues.forEach((entry) => {
+    const normalized = entry.toLowerCase().trim()
+    if (!normalized) return
+    selection.add(normalized)
+  })
+
+  return Array.from(selection)
+}
+
+function matchesExerciseEquipment(exerciseEquipment: string, equipmentSelection: Set<string>) {
+  const normalizedExerciseEquipment = exerciseEquipment.toLowerCase().trim()
+  const selection = Array.from(equipmentSelection)
+  const hasSelection = (...terms: string[]) => selection.some((item) => terms.some((term) => item.includes(term)))
+
+  if (normalizedExerciseEquipment === 'bodyweight') return true
+  if (hasSelection('bodyweight')) return true
+  if (hasSelection('gym access', 'gym')) return true
+  if (hasSelection('dumbbell') && normalizedExerciseEquipment === 'dumbbell') return true
+  if (hasSelection('barbell') && normalizedExerciseEquipment === 'barbell') return true
+  if (hasSelection('band') && normalizedExerciseEquipment === 'band') return true
+  if (hasSelection('cable') && normalizedExerciseEquipment === 'cable') return true
+  if (
+    hasSelection('machine', 'treadmill', 'cardio machine', 'leg press machine') &&
+    (normalizedExerciseEquipment === 'machine' || normalizedExerciseEquipment === 'stationary bike' || normalizedExerciseEquipment === 'elliptical machine')
+  ) {
+    return true
+  }
+  if (hasSelection('rope', 'jump rope') && normalizedExerciseEquipment === 'rope') return true
+  if (hasSelection('stationary bike', 'bike') && normalizedExerciseEquipment === 'stationary bike') return true
+  if (hasSelection('elliptical machine', 'elliptical') && normalizedExerciseEquipment === 'elliptical machine') return true
+  return false
+}
+
+function filterExercisesByEquipment(exercises: Exercise[], equipment: string | string[]): Exercise[] {
+  const selection = new Set(normalizeEquipmentSelection(equipment))
+  if (selection.size === 0 || selection.has('gym access')) {
     return exercises
   }
-  
-  const hasDumbbells = equipment.toLowerCase().includes('dumbbell')
-  const hasCables = equipment.toLowerCase().includes('cable')
-  return exercises.filter(ex => {
-    if (ex.equipment === 'bodyweight') return true
-    if (hasDumbbells && ex.equipment === 'dumbbell') return true
-    if (hasCables && ex.equipment === 'cable') return true
-    if (ex.equipment === 'bodyweight') return true
-    return false
-  })
+
+  return exercises.filter((exercise) => matchesExerciseEquipment(exercise.equipment, selection))
 }
 
 function filterExercisesByInjury(exercises: Exercise[], injuries?: string): Exercise[] {
@@ -486,8 +560,22 @@ function exerciseMatchesCategory(exercise: Exercise, category: string) {
 function getPreferredCategories(profile: UserProfile, split: string, day: number) {
   const goalProfile = getGoalProfile(profile.goals)
   const bodyPriority = getBodyPriority(profile)
+  const bodyPartTargets = goalProfile.bodyPartTargets
+  const upperTargets = bodyPartTargets.filter((part) => part !== 'Legs')
+  const upperTargetSet = new Set<BodyPart>(upperTargets)
+  const upperEmphasis: BodyPart[] = [
+    ...upperTargets,
+    ...(['Chest', 'Back', 'Shoulders', 'Arms'] as BodyPart[]).filter((part) => !upperTargetSet.has(part)),
+  ]
+  const lowerEmphasis = ['Legs', 'Waist', 'Core'] as BodyPart[]
 
   if (split === 'full_body' || split === 'full_body_3x') {
+    if (bodyPartTargets.length > 0) {
+      if (upperTargets.length > 0) {
+        return upperEmphasis
+      }
+      return lowerEmphasis
+    }
     if (goalProfile.mobility) return ['Mobility', 'Waist', 'Legs', 'Back']
     if (goalProfile.posture) return ['Back', 'Shoulders', 'Waist', 'Mobility']
     if (goalProfile.core) return ['Waist', 'Legs', 'Back', 'Mobility']
@@ -498,6 +586,12 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
   }
 
   if (split === 'upper_lower') {
+    if (bodyPartTargets.length > 0) {
+      if (upperTargets.length > 0) {
+        return upperEmphasis
+      }
+      return lowerEmphasis
+    }
     const upper = day % 2 === 1
     if (goalProfile.mobility) {
       return upper ? ['Mobility', 'Back', 'Shoulders', 'Waist'] : ['Legs', 'Mobility', 'Waist']
@@ -521,6 +615,12 @@ function getPreferredCategories(profile: UserProfile, split: string, day: number
   }
 
   const phase = day % 3
+  if (bodyPartTargets.length > 0) {
+    if (upperTargets.length > 0) {
+      return phase === 1 || phase === 2 ? upperEmphasis : ['Arms', 'Chest', 'Back', 'Shoulders']
+    }
+    return lowerEmphasis
+  }
   if (goalProfile.mobility) {
     if (phase === 1) return ['Mobility', 'Waist', 'Shoulders']
     if (phase === 2) return ['Back', 'Mobility', 'Waist']
@@ -638,11 +738,15 @@ function buildDay(day: number, focus: string, categories: string[], profile: Use
     const rotation = pool.length > 1 ? (day - 1) % pool.length : 0
     const rotatedPool = pool.slice(rotation).concat(pool.slice(0, rotation))
 
-    const maxForCategory =
-      category === 'Legs'
-        ? goalProfile.conditioning || goalProfile.core || goalProfile.posture
+  const maxForCategory =
+      goalProfile.bodyPartTargets.includes(category as BodyPart)
+        ? category === 'Legs'
           ? 3
           : 2
+        : category === 'Legs'
+          ? goalProfile.conditioning || goalProfile.core || goalProfile.posture
+            ? 3
+            : 2
         : category === 'Waist'
           ? 2
           : category === 'Conditioning'

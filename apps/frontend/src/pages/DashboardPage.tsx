@@ -32,7 +32,7 @@ type DashboardProfile = {
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
   experienceLevel: 'beginner' | 'intermediate' | 'advanced'
   injuries?: string
-  equipment?: string
+  equipment?: string | string[]
   workoutDays: number
   sessionDuration: number
 } | null
