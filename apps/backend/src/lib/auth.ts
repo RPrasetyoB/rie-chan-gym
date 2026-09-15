@@ -6,6 +6,7 @@ export interface TokenPayload {
   sub: string
   email: string
   name: string
+  role?: string
 }
 
 export function hashPassword(password: string) {

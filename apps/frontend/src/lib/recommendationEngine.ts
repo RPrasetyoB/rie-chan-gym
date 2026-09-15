@@ -206,8 +206,8 @@ const RAW_EXERCISE_DATABASE: Exercise[] = [
   { id: 'dumbbell_fly', name: 'Dumbbell Fly', category: 'Chest', difficulty: 'intermediate', equipment: 'dumbbell', muscleGroups: ['Chest'] },
   { id: '0025', name: 'Barbell Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
   { id: '0033', name: 'Barbell Decline Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
-  { id: '0009', name: 'Assisted Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Chest', 'Triceps'] },
-  { id: '2364', name: 'Assisted Wide-Grip Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Chest', 'Triceps'] },
+  { id: '0009', name: 'Assisted Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'assisted dip machine', muscleGroups: ['Chest', 'Triceps'] },
+  { id: '2364', name: 'Assisted Wide-Grip Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'assisted dip machine', muscleGroups: ['Chest', 'Triceps'] },
   { id: '1254', name: 'Band Bench Press', category: 'Chest', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Chest', 'Triceps'] },
   { id: '0047', name: 'Barbell Incline Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Shoulders', 'Triceps'] },
   { id: '0122', name: 'Barbell Wide Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
@@ -216,35 +216,35 @@ const RAW_EXERCISE_DATABASE: Exercise[] = [
   { id: '0171', name: 'Cable Incline Fly', category: 'Chest', difficulty: 'beginner', equipment: 'cable', muscleGroups: ['Chest'] },
   { id: 'barbell_bench_press', name: 'Barbell Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
   { id: 'barbell_decline_bench_press', name: 'Barbell Decline Bench Press', category: 'Chest', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
-  { id: 'assisted_chest_dip_kneeling', name: 'Assisted Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Chest', 'Triceps'] },
-  { id: 'assisted_wide_grip_chest_dip_kneeling', name: 'Assisted Wide-Grip Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Chest', 'Triceps'] },
+  { id: 'assisted_chest_dip_kneeling', name: 'Assisted Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'assisted dip machine', muscleGroups: ['Chest', 'Triceps'] },
+  { id: 'assisted_wide_grip_chest_dip_kneeling', name: 'Assisted Wide-Grip Chest Dip (Kneeling)', category: 'Chest', difficulty: 'beginner', equipment: 'assisted dip machine', muscleGroups: ['Chest', 'Triceps'] },
   { id: 'band_bench_press', name: 'Band Bench Press', category: 'Chest', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Chest', 'Triceps'] },
   { id: 'band_one_arm_twisting_chest_press', name: 'Band One Arm Twisting Chest Press', category: 'Chest', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Chest', 'Shoulders'] },
   { id: 'archer_push_up', name: 'Archer Push Up', category: 'Chest', difficulty: 'advanced', equipment: 'bodyweight', muscleGroups: ['Chest', 'Triceps', 'Shoulders'] },
   
   // Back
   { id: 'deadlift', name: 'Deadlift', category: 'Back', difficulty: 'advanced', equipment: 'barbell', muscleGroups: ['Back', 'Glutes', 'Hamstrings'] },
-  { id: 'pull_up', name: 'Pull Up', category: 'Back', difficulty: 'intermediate', equipment: 'bodyweight', muscleGroups: ['Back', 'Biceps'] },
+  { id: 'pull_up', name: 'Pull Up', category: 'Back', difficulty: 'intermediate', equipment: 'pull-up bar', muscleGroups: ['Back', 'Biceps'] },
   { id: 'lat_pulldown', name: 'Lat Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'cable', muscleGroups: ['Back', 'Biceps'] },
   { id: 'barbell_row', name: 'Barbell Row', category: 'Back', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Back', 'Biceps'] },
   { id: 'seated_cable_row', name: 'Seated Cable Row', category: 'Back', difficulty: 'beginner', equipment: 'cable', muscleGroups: ['Back', 'Biceps'] },
   { id: '0007', name: 'Alternate Lateral Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'cable', muscleGroups: ['Lats', 'Back'] },
-  { id: '3293', name: 'Archer Pull Up', category: 'Back', difficulty: 'advanced', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
-  { id: '0015', name: 'Assisted Parallel Close Grip Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
-  { id: '0017', name: 'Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
-  { id: '1431', name: 'Assisted Standing Chin-Up', category: 'Back', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
+  { id: '3293', name: 'Archer Pull Up', category: 'Back', difficulty: 'advanced', equipment: 'pull-up bar', muscleGroups: ['Lats', 'Biceps'] },
+  { id: '0015', name: 'Assisted Parallel Close Grip Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'assisted pull-up machine', muscleGroups: ['Lats', 'Biceps'] },
+  { id: '0017', name: 'Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'assisted pull-up machine', muscleGroups: ['Lats', 'Biceps'] },
+  { id: '1431', name: 'Assisted Standing Chin-Up', category: 'Back', difficulty: 'beginner', equipment: 'machine', muscleGroups: ['Lats', 'Biceps'] },
   { id: '0970', name: 'Band Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Biceps'] },
   { id: '0974', name: 'Band Close-Grip Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Back'] },
   { id: '0983', name: 'Band Kneeling One Arm Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Back'] },
   { id: '0027', name: 'Barbell Bent Over Row', category: 'Back', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Back', 'Biceps'] },
   { id: '3017', name: 'Barbell Pendlay Row', category: 'Back', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Back', 'Biceps'] },
   { id: 'alternate_lateral_pulldown', name: 'Alternate Lateral Pulldown', category: 'Back', difficulty: 'intermediate', equipment: 'cable', muscleGroups: ['Lats', 'Back'] },
-  { id: 'assisted_parallel_close_grip_pull_up', name: 'Assisted Parallel Close Grip Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
-  { id: 'assisted_pull_up', name: 'Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'bodyweight', muscleGroups: ['Lats', 'Biceps'] },
+  { id: 'assisted_parallel_close_grip_pull_up', name: 'Assisted Parallel Close Grip Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'assisted pull-up machine', muscleGroups: ['Lats', 'Biceps'] },
+  { id: 'assisted_pull_up', name: 'Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'assisted pull-up machine', muscleGroups: ['Lats', 'Biceps'] },
   { id: 'band_assisted_pull_up', name: 'Band Assisted Pull-Up', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Biceps'] },
   { id: 'band_close_grip_pulldown', name: 'Band Close-Grip Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Back'] },
   { id: 'band_kneeling_one_arm_pulldown', name: 'Band Kneeling One Arm Pulldown', category: 'Back', difficulty: 'beginner', equipment: 'band', muscleGroups: ['Lats', 'Back'] },
-  { id: 'archer_pull_up', name: 'Archer Pull Up', category: 'Back', difficulty: 'advanced', equipment: 'bodyweight', muscleGroups: ['Back', 'Biceps'] },
+  { id: 'archer_pull_up', name: 'Archer Pull Up', category: 'Back', difficulty: 'advanced', equipment: 'pull-up bar', muscleGroups: ['Back', 'Biceps'] },
   
   // Shoulders
   { id: 'overhead_press', name: 'Overhead Press', category: 'Shoulders', difficulty: 'intermediate', equipment: 'barbell', muscleGroups: ['Shoulders', 'Triceps'] },
@@ -536,6 +536,9 @@ function matchesExerciseEquipment(exerciseEquipment: string, equipmentSelection:
   if (hasSelection('barbell') && normalizedExerciseEquipment === 'barbell') return true
   if (hasSelection('band') && normalizedExerciseEquipment === 'band') return true
   if (hasSelection('cable') && normalizedExerciseEquipment === 'cable') return true
+  if (hasSelection('pull-up bar', 'pullup bar', 'pull up bar') && normalizedExerciseEquipment === 'pull-up bar') return true
+  if (hasSelection('assisted pull-up machine', 'assisted pullup machine') && normalizedExerciseEquipment === 'assisted pull-up machine') return true
+  if (hasSelection('assisted dip machine', 'dip machine') && normalizedExerciseEquipment === 'assisted dip machine') return true
   if (
     hasSelection('machine', 'treadmill', 'cardio machine', 'leg press machine') &&
     (normalizedExerciseEquipment === 'machine' || normalizedExerciseEquipment === 'stationary bike' || normalizedExerciseEquipment === 'elliptical machine')

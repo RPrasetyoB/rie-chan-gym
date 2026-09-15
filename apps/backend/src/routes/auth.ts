@@ -65,11 +65,12 @@ authRouter.post('/register', async (req, res, next) => {
         id: true,
         email: true,
         name: true,
+        role: true,
       },
     })
 
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, name: user.name })
-    const refreshToken = signRefreshToken({ sub: user.id, email: user.email, name: user.name })
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, name: user.name, role: user.role })
+    const refreshToken = signRefreshToken({ sub: user.id, email: user.email, name: user.name, role: user.role })
     await storeRefreshToken(user.id, refreshToken)
 
     res.status(201).json({
@@ -96,6 +97,7 @@ authRouter.post('/login', async (req, res, next) => {
         email: true,
         name: true,
         passwordHash: true,
+        role: true,
       },
     })
     if (!user) {
@@ -107,12 +109,12 @@ authRouter.post('/login', async (req, res, next) => {
       throw new AppError(401, 'Invalid email or password')
     }
 
-    const accessToken = signAccessToken({ sub: user.id, email: user.email, name: user.name })
-    const refreshToken = signRefreshToken({ sub: user.id, email: user.email, name: user.name })
+    const accessToken = signAccessToken({ sub: user.id, email: user.email, name: user.name, role: user.role })
+    const refreshToken = signRefreshToken({ sub: user.id, email: user.email, name: user.name, role: user.role })
     await storeRefreshToken(user.id, refreshToken)
 
     res.json({
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
       accessToken,
       refreshToken,
     })
@@ -142,6 +144,7 @@ authRouter.post('/refresh', async (req, res, next) => {
             id: true,
             email: true,
             name: true,
+            role: true,
           },
         },
       },
@@ -155,11 +158,13 @@ authRouter.post('/refresh', async (req, res, next) => {
       sub: storedToken.user.id,
       email: storedToken.user.email,
       name: storedToken.user.name,
+      role: storedToken.user.role,
     })
     const refreshToken = signRefreshToken({
       sub: storedToken.user.id,
       email: storedToken.user.email,
       name: storedToken.user.name,
+      role: storedToken.user.role,
     })
 
     await rotateRefreshToken(storedToken.user.id, token.data, refreshToken)
@@ -189,6 +194,7 @@ authRouter.get('/me', async (req, res, next) => {
         id: true,
         email: true,
         name: true,
+        role: true,
       },
     })
 
@@ -196,7 +202,7 @@ authRouter.get('/me', async (req, res, next) => {
       throw new AppError(401, 'Unknown user')
     }
 
-    res.json({ user: { id: user.id, email: user.email, name: user.name } })
+    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } })
   } catch (error) {
     next(error)
   }
@@ -220,6 +226,28 @@ authRouter.post('/logout', requireAuth, async (req: AuthenticatedRequest, res, n
     })
 
     res.json({ message: 'Logged out' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+authRouter.delete('/account', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const deleteAllData = z.boolean().optional().default(true).parse(req.body?.deleteAllData)
+    if (deleteAllData) {
+      await prisma.user.delete({ where: { id: req.user!.id } })
+    } else {
+      await prisma.$transaction([
+        prisma.profile.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.userGoal.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.notification.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.aiUsage.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.refreshToken.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.meal.deleteMany({ where: { userId: req.user!.id } }),
+        prisma.user.update({ where: { id: req.user!.id }, data: { name: 'Deleted user', email: `deleted-${req.user!.id}@deleted.invalid`, passwordHash: 'account-disabled', role: 'user' } }),
+      ])
+    }
+    res.json({ message: deleteAllData ? 'Account and associated data deleted' : 'Account access removed; fitness history retained' })
   } catch (error) {
     next(error)
   }

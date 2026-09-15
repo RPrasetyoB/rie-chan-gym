@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { apiPost, saveAuthTokens } from '@/lib/api'
+import { saveAuthSession } from '@/lib/appState'
+
+type LoginPageProps = { adminMode?: boolean }
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -16,7 +19,7 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-export default function LoginPage() {
+export default function LoginPage({ adminMode = false }: LoginPageProps) {
   const navigate = useNavigate()
   const { toast } = useToast()
   const {
@@ -30,22 +33,28 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       const response = await apiPost<{
-        user: { id: string; email: string; name: string }
+        user: { id: string; email: string; name: string; role: string }
         accessToken: string
         refreshToken: string
       }>('/auth/login', data, false)
+
+      if (adminMode && response.user.role !== 'admin') {
+        toast({ title: 'Admin access required', description: 'This account does not have administrator permissions.', variant: 'destructive' })
+        return
+      }
 
       saveAuthTokens({
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
       })
+      saveAuthSession({ id: response.user.id, name: response.user.name, email: response.user.email, role: response.user.role, createdAt: new Date().toISOString() })
 
       toast({
         title: 'Welcome back!',
         description: 'You are signed in to Rie-chan Cute PT.',
       })
 
-      navigate('/')
+      navigate(response.user.role === 'admin' ? '/admin' : '/')
     } catch (error) {
       toast({
         title: 'Sign in failed',
@@ -58,9 +67,9 @@ export default function LoginPage() {
   return (
     <Card className="w-full border-2 border-primary/20">
       <CardHeader className="space-y-1">
-        <CardTitle className="font-display text-2xl text-center">Welcome Back!</CardTitle>
+        <CardTitle className="font-display text-2xl text-center">{adminMode ? 'Admin sign in' : 'Welcome Back!'}</CardTitle>
         <CardDescription className="text-center">
-          Sign in to continue your fitness journey with Rie-chan
+          {adminMode ? 'Sign in with an administrator account to continue.' : 'Sign in to continue your fitness journey with Rie-chan'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -104,10 +113,8 @@ export default function LoginPage() {
           </Button>
 
           <div className="text-center text-sm">
-            <span className="text-muted-foreground">Don't have an account? </span>
-            <Link to="/register" className="text-primary hover:underline font-medium">
-              Sign up
-            </Link>
+            {!adminMode && <span className="text-muted-foreground">Don't have an account? </span>}
+            {!adminMode && <Link to="/register" className="text-primary hover:underline font-medium">Sign up</Link>}
           </div>
         </form>
       </CardContent>

@@ -84,10 +84,10 @@ export default function OnboardingGoalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 p-4 safe-area-top safe-area-bottom">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 px-4 pt-8 pb-10">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-6">
-          <RieChanAvatar size={64} pose="point" />
+          <RieChanAvatar size={64} pose="point" className="mx-auto" />
           <h1 className="font-display text-2xl font-bold mt-4">What are your goals?</h1>
           <p className="text-muted-foreground text-sm">Select all that apply - you can have multiple goals!</p>
         </div>

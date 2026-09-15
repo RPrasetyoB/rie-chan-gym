@@ -18,11 +18,16 @@ import OnboardingWelcomePage from './pages/onboarding/OnboardingWelcomePage'
 import OnboardingProfilePage from './pages/onboarding/OnboardingProfilePage'
 import OnboardingGoalsPage from './pages/onboarding/OnboardingGoalsPage'
 import OnboardingCompletePage from './pages/onboarding/OnboardingCompletePage'
+import AdminPage from './pages/AdminPage'
+import NotFoundPage from './pages/NotFoundPage'
+import PrivacyPage from './pages/PrivacyPage'
+import NotificationsPage from './pages/NotificationsPage'
 
 // Layouts
 import AuthLayout from './layouts/AuthLayout'
 import MainLayout from './layouts/MainLayout'
 import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,22 +54,30 @@ function App() {
             {/* Auth Routes */}
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin/login" element={<LoginPage adminMode />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             </Route>
 
             {/* Main App Routes */}
             <Route element={<RequireAuth />}>
+              <Route element={<RequireAdmin />}>
+                <Route path="/admin" element={<AdminPage />} />
+              </Route>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/workout" element={<WorkoutPage />} />
                 <Route path="/exercises" element={<ExercisesPage />} />
                 <Route path="/progress" element={<ProgressPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/ai-coach" element={<AICoachPage />} />
               </Route>
             </Route>
+
+            <Route path="/not-found" element={<NotFoundPage />} />
 
             {/* Fallback - redirect to onboarding */}
             <Route path="*" element={<OnboardingWelcomePage />} />

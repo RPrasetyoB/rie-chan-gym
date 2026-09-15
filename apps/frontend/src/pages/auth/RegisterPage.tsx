@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { apiPost, saveAuthTokens } from '@/lib/api'
+import { saveAuthSession } from '@/lib/appState'
 
 const registerSchema = z
   .object({
@@ -37,7 +38,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       const response = await apiPost<{
-        user: { id: string; email: string; name: string }
+        user: { id: string; email: string; name: string; role: string }
         accessToken: string
         refreshToken: string
       }>('/auth/register', {
@@ -50,6 +51,7 @@ export default function RegisterPage() {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
       })
+      saveAuthSession({ id: response.user.id, name: response.user.name, email: response.user.email, role: response.user.role, createdAt: new Date().toISOString() })
 
       toast({
         title: 'Account created!',

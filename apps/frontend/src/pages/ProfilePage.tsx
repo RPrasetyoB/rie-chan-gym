@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Settings, LogOut, Moon, Sun, Bell, Shield, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,7 +7,7 @@ import { useTheme } from '@/components/theme-provider'
 import { RieChanAvatar } from '@/components/rie-chan/RieChanAvatar'
 import { calculateAgeFromBirthday, clearOnboardingState, loadOnboardingState, normalizeEquipmentSelection } from '@/lib/onboardingStorage'
 import { clearAuthSession, loadAuthSession } from '@/lib/appState'
-import { apiPost, clearAuthTokens } from '@/lib/api'
+import { apiDelete, apiPost, clearAuthTokens } from '@/lib/api'
 
 function formatEquipmentLabel(value: string) {
   return value
@@ -21,6 +22,9 @@ export default function ProfilePage() {
   const authSession = loadAuthSession()
   const profile = onboardingState.profile
   const age = profile?.birthday ? calculateAgeFromBirthday(profile.birthday) : null
+  const [panel, setPanel] = useState<'privacy' | 'notifications' | null>(null)
+  const [notifyWorkout, setNotifyWorkout] = useState(() => localStorage.getItem('rie-chan-notify-workout') !== 'false')
+  const [notifyCoach, setNotifyCoach] = useState(() => localStorage.getItem('rie-chan-notify-coach') !== 'false')
 
   const handleLogout = async () => {
     await apiPost('/auth/logout', {}, true).catch(() => undefined)
@@ -29,13 +33,13 @@ export default function ProfilePage() {
     navigate('/login')
   }
 
-  const handleDeleteAccount = () => {
-    const confirmed = window.confirm(
-      'Delete your local profile data and onboarding progress? This cannot be undone.',
-    )
+  const handleDeleteAccount = async () => {
+    const deleteAllData = window.confirm('Delete your account and ALL workout, progress, and profile data? Select Cancel to keep your fitness history.')
+    const confirmed = deleteAllData || window.confirm('Delete your account while keeping your fitness history where possible? This cannot be undone.')
 
     if (!confirmed) return
 
+    await apiDelete('/auth/account', { deleteAllData }).catch(() => undefined)
     clearAuthSession()
     clearAuthTokens()
     clearOnboardingState()
@@ -128,11 +132,11 @@ export default function ProfilePage() {
             )}
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/notifications')}>
             <Bell className="h-4 w-4 mr-2" />
-            Notifications
+            Notifications <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">2</span>
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/privacy')}>
             <Shield className="h-4 w-4 mr-2" />
             Privacy & Security
           </Button>
@@ -154,6 +158,12 @@ export default function ProfilePage() {
           <Button variant="outline" className="w-full justify-start" onClick={handleExportData}>
             Export Data
           </Button>
+          {authSession?.role === 'admin' && (
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin')}>
+              <Shield className="h-4 w-4 mr-2" />
+              Open Admin Console
+            </Button>
+          )}
           <Button
             variant="outline"
             className="w-full justify-start text-destructive hover:text-destructive"
@@ -178,6 +188,37 @@ export default function ProfilePage() {
           Not medical advice — consult a doctor or physical therapist before starting any new exercise program, especially with existing injuries or health conditions.
         </p>
       </div>
+
+      {panel && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 grid place-items-center" role="presentation" onClick={() => setPanel(null)}>
+          <div className="w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl p-6" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-primary text-xs font-semibold uppercase tracking-wide">Rie-chan settings</p>
+                <h2 className="font-display text-2xl font-bold mt-1">{panel === 'privacy' ? 'Privacy & Security' : 'Notifications'}</h2>
+              </div>
+              <button onClick={() => setPanel(null)} className="text-muted-foreground hover:text-foreground text-2xl leading-none" aria-label="Close">×</button>
+            </div>
+
+            {panel === 'notifications' ? (
+              <div className="mt-6 space-y-5">
+                <div className="space-y-3">
+                  <div className="flex gap-3 rounded-xl bg-primary/10 p-3"><div className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center"><Bell className="h-4 w-4" /></div><div><p className="font-medium text-sm">Your weekly check-in is ready</p><p className="text-xs text-muted-foreground mt-1">Review your progress and keep your streak going.</p></div></div>
+                  <div className="flex gap-3 rounded-xl bg-secondary p-3"><div className="h-8 w-8 shrink-0 rounded-full bg-background text-primary grid place-items-center"><Shield className="h-4 w-4" /></div><div><p className="font-medium text-sm">Small steps count</p><p className="text-xs text-muted-foreground mt-1">Rie-chan is cheering you on for your next workout.</p></div></div>
+                </div>
+                <div className="border-t border-border pt-5 space-y-4"><p className="font-display font-semibold">Notification preferences</p><label className="flex items-center justify-between gap-4 text-sm"><span><span className="font-medium block">Workout reminders</span><span className="text-xs text-muted-foreground">Get a nudge when it’s time to train.</span></span><input type="checkbox" checked={notifyWorkout} onChange={(event) => { setNotifyWorkout(event.target.checked); localStorage.setItem('rie-chan-notify-workout', String(event.target.checked)) }} className="h-5 w-5 accent-primary" /></label><label className="flex items-center justify-between gap-4 text-sm"><span><span className="font-medium block">Coach encouragement</span><span className="text-xs text-muted-foreground">Receive helpful tips from Rie-chan.</span></span><input type="checkbox" checked={notifyCoach} onChange={(event) => { setNotifyCoach(event.target.checked); localStorage.setItem('rie-chan-notify-coach', String(event.target.checked)) }} className="h-5 w-5 accent-primary" /></label></div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4 text-sm">
+                <div className="rounded-xl border border-border p-4"><p className="font-display font-semibold">Your data belongs to you</p><p className="text-muted-foreground mt-1">Rie-chan uses your profile and workout information to personalize plans, progress tracking, and coaching.</p></div>
+                <div className="space-y-2"><Button variant="outline" className="w-full justify-start" onClick={handleExportData}>Download my data</Button><Button variant="outline" className="w-full justify-start" onClick={() => window.alert('Privacy policy: We only use your fitness data to provide and improve your Rie-chan experience. We never sell personal data.')}>Read privacy policy</Button><Button variant="outline" className="w-full justify-start" onClick={() => window.alert('Security: Your session is protected with access and refresh tokens. Sign out on shared devices and never share your password.')}>Security information</Button></div>
+                <p className="text-xs text-muted-foreground">You can permanently remove your account from the Account section below. This action cannot be undone.</p>
+              </div>
+            )}
+            <Button variant="secondary" className="w-full mt-6" onClick={() => setPanel(null)}>Done</Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

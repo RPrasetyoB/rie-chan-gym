@@ -243,6 +243,7 @@ export default function WorkoutPage() {
   const [isWorkoutActive, setIsWorkoutActive] = useState(false)
   const [isResting, setIsResting] = useState(false)
   const [restTimeRemaining, setRestTimeRemaining] = useState(0)
+  const [awaitingProgression, setAwaitingProgression] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0)
   const [currentSetIndex, setCurrentSetIndex] = useState(0)
@@ -256,6 +257,7 @@ export default function WorkoutPage() {
   const [cheerMessageIndex, setCheerMessageIndex] = useState(0)
   const [isCompactLandscapePhone, setIsCompactLandscapePhone] = useState(false)
   const fullscreenShellRef = useRef<HTMLDivElement | null>(null)
+  const targetAnnouncementRef = useRef<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -344,6 +346,19 @@ export default function WorkoutPage() {
   )
   const currentExerciseMedia = getExerciseMedia(currentExercise?.id, currentExercise?.name)
   const currentGoalDrivers = currentPlanDay?.goalDrivers ?? []
+  const targetReached = Boolean(
+    isCameraActive &&
+      cameraTrackingMode &&
+      currentSet &&
+      currentSet.reps > 0 &&
+      currentReps >= currentSet.reps,
+  )
+  const progressionActionLabel =
+    currentSetIndex < (currentExercise?.sets.length ?? 0) - 1
+      ? 'Start Rest & Next Set'
+      : currentExerciseIndex < activeWorkout.length - 1
+        ? 'Next Exercise'
+        : 'Finish Workout'
   const completedSets = useMemo(
     () =>
       activeWorkout.reduce(
@@ -376,6 +391,23 @@ export default function WorkoutPage() {
       setCurrentReps(currentSet.reps)
     }
   }, [currentSet, isCameraActive])
+
+  useEffect(() => {
+    setAwaitingProgression(false)
+    targetAnnouncementRef.current = null
+  }, [currentExerciseIndex, currentSetIndex])
+
+  useEffect(() => {
+    if (!currentSet || !cameraTrackingMode || !isCameraActive) return
+
+    const setKey = `${currentExerciseIndex}-${currentSetIndex}`
+    if (targetReached && targetAnnouncementRef.current !== setKey) {
+      targetAnnouncementRef.current = setKey
+      setStatusMessage('Target reached. Review your form, then log the set when you are ready.')
+    } else if (!targetReached && targetAnnouncementRef.current === setKey) {
+      targetAnnouncementRef.current = null
+    }
+  }, [cameraTrackingMode, currentExerciseIndex, currentReps, currentSet, currentSetIndex, isCameraActive, targetReached])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -411,9 +443,11 @@ export default function WorkoutPage() {
     setIsWorkoutActive(true)
     setIsResting(false)
     setRestTimeRemaining(0)
+    setAwaitingProgression(false)
     setElapsedSeconds(0)
     setCurrentExerciseIndex(0)
     setCurrentSetIndex(0)
+    setCurrentReps(0)
     setSessionStartedAt(startedAt)
     setStatusMessage('Starting live workout session...')
 
@@ -435,6 +469,9 @@ export default function WorkoutPage() {
 
   const moveToNextSet = () => {
     if (!currentExercise) return
+
+    setAwaitingProgression(false)
+    setCurrentReps(0)
 
     if (currentSetIndex < currentExercise.sets.length - 1) {
       setCurrentSetIndex((value) => value + 1)
@@ -476,7 +513,7 @@ export default function WorkoutPage() {
   }
 
   const completeSet = async () => {
-    if (!currentExercise || !currentSet) return
+    if (!currentExercise || !currentSet || currentSet.completed || awaitingProgression) return
 
     const now = new Date().toISOString()
     const nextWorkout = cloneWorkout(activeWorkout)
@@ -497,7 +534,7 @@ export default function WorkoutPage() {
     }
 
     setStatusMessage(`Logged ${currentReps} reps at ${currentWeight} kg. Strong work.`)
-    moveToNextSet()
+    setAwaitingProgression(true)
   }
 
   const skipSet = () => {
@@ -637,7 +674,7 @@ export default function WorkoutPage() {
   }
 
   const restOverlay = isResting ? (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4">
+    <div className={`${isFullscreenMode ? 'fixed z-[80] bg-black/85' : 'absolute z-20 bg-background/90'} inset-0 flex items-center justify-center backdrop-blur-sm p-4`}>
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-xl">
         <RieChanAvatar size={96} expression="rest" className="mx-auto mb-4 animate-pulse-glow" />
         <h2 className="font-display text-2xl font-bold mb-2">Rest Time</h2>
@@ -662,13 +699,14 @@ export default function WorkoutPage() {
   return (
     <div ref={fullscreenShellRef} className="relative h-full flex flex-col p-4 w-full max-w-6xl mx-auto">
       {isFullscreenMode && (
-        <div className="fixed inset-0 z-50 bg-black text-white">
+        <div className="fixed inset-0 z-[70] bg-black text-white">
           <div className="relative h-full w-full overflow-hidden">
             <div className="absolute inset-0">
               <Suspense fallback={<CameraRepCounterFallback />}>
                 <CameraRepCounter
                   exerciseId={currentExercise?.id}
                   exerciseName={currentExercise?.name}
+                  resetKey={`${currentExerciseIndex}-${currentSetIndex}`}
                   isWorkoutActive={isWorkoutActive}
                   isTrackingEnabled={!isResting}
                   showControls={false}
@@ -697,6 +735,25 @@ export default function WorkoutPage() {
                 <p className={isCompactFullscreen ? 'font-display text-lg font-bold leading-none' : 'font-display text-2xl font-bold leading-none'}>{currentSet?.reps ?? 0}</p>
               </div>
             </div>
+
+            {(targetReached || awaitingProgression) && (
+              <div className={isCompactFullscreen ? 'absolute bottom-24 left-2 right-2 z-30 rounded-xl border border-white/15 bg-black/75 p-3 backdrop-blur-md' : 'absolute bottom-28 left-1/2 z-30 w-[min(90vw,360px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-black/75 p-4 text-center backdrop-blur-md'}>
+                <p className="text-sm font-semibold text-white">
+                  {awaitingProgression ? 'Set logged' : 'Target reached'}
+                </p>
+                <p className="mt-1 text-xs text-white/70">
+                  {awaitingProgression ? 'Choose when you are ready to continue.' : 'Review your form, then log the set.'}
+                </p>
+                <Button
+                  className="mt-3 w-full"
+                  size={isCompactFullscreen ? 'sm' : 'default'}
+                  onClick={awaitingProgression ? moveToNextSet : completeSet}
+                >
+                  {awaitingProgression ? <Play className="mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
+                  {awaitingProgression ? progressionActionLabel : 'Log Set'}
+                </Button>
+              </div>
+            )}
 
             {currentExerciseMedia && (
               <div className={isCompactFullscreen ? 'absolute bottom-1 left-1 z-20 w-[min(24vw,180px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md' : 'absolute bottom-1 left-1 z-20 w-[min(34vw,260px)] overflow-hidden rounded-2xl border border-white/10 bg-black/65 shadow-2xl backdrop-blur-md'}>
@@ -788,16 +845,19 @@ export default function WorkoutPage() {
 
               <div className="px-4 pt-2 pb-4 space-y-2">
                 <div className="rounded-lg bg-card/60 p-1.5">
-                  <Suspense fallback={<CameraRepCounterFallback />}>
-                    <CameraRepCounter
-                      exerciseId={currentExercise?.id}
-                      exerciseName={currentExercise?.name}
-                      isWorkoutActive={isWorkoutActive}
-                      isTrackingEnabled={!isResting}
-                      onRepCountChange={setCurrentReps}
-                      onCameraActiveChange={setIsCameraActive}
-                    />
-                  </Suspense>
+                  {!isFullscreenMode && (
+                    <Suspense fallback={<CameraRepCounterFallback />}>
+                      <CameraRepCounter
+                        exerciseId={currentExercise?.id}
+                        exerciseName={currentExercise?.name}
+                        resetKey={`${currentExerciseIndex}-${currentSetIndex}`}
+                        isWorkoutActive={isWorkoutActive}
+                        isTrackingEnabled={!isResting}
+                        onRepCountChange={setCurrentReps}
+                        onCameraActiveChange={setIsCameraActive}
+                      />
+                    </Suspense>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -884,16 +944,36 @@ export default function WorkoutPage() {
           </Card>
         </div>
 
-        <div className="flex gap-4 w-full">
-          <Button variant="outline" className="flex-1 h-14" size="lg" onClick={skipSet}>
-            <SkipForward className="h-5 w-5 mr-2" />
-            Skip
-          </Button>
-          <Button className="flex-1 h-14" size="lg" onClick={completeSet}>
-            <Check className="h-5 w-5 mr-2" />
-            Log Set
-          </Button>
-        </div>
+        {targetReached && !awaitingProgression && (
+          <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-center">
+            <p className="font-semibold text-primary">Target reached</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review your form, then tap Log Set when you are ready.
+            </p>
+          </div>
+        )}
+
+        {awaitingProgression ? (
+          <div className="rounded-xl border border-primary/30 bg-primary/10 p-3">
+            <p className="font-semibold">Set logged</p>
+            <p className="mt-1 text-sm text-muted-foreground">Choose when you are ready to continue.</p>
+            <Button className="mt-3 h-14 w-full" size="lg" onClick={moveToNextSet}>
+              <Play className="mr-2 h-5 w-5" />
+              {progressionActionLabel}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex w-full gap-4">
+            <Button variant="outline" className="h-14 flex-1" size="lg" onClick={skipSet}>
+              <SkipForward className="mr-2 h-5 w-5" />
+              Skip
+            </Button>
+            <Button className="h-14 flex-1" size="lg" onClick={completeSet}>
+              <Check className="mr-2 h-5 w-5" />
+              Log Set
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

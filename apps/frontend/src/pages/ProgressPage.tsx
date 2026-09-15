@@ -188,6 +188,16 @@ export default function ProgressPage() {
         </p>
       )}
 
+      <div className="mb-4 flex items-center gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <RieChanAvatar size={112} feature="progress" className="shrink-0" />
+        <div>
+          <p className="font-display font-semibold">See how you&apos;re growing</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track your consistency, strength, and body changes in one place.
+          </p>
+        </div>
+      </div>
+
       <div className="flex gap-2 mb-4">
         <Button
           variant={selectedTab === 'weight' ? 'default' : 'outline'}

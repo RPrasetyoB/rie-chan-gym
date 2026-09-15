@@ -325,6 +325,9 @@ function filterExercises(equipment: string | string[] | undefined, injuries: str
       return true
     }
     if (hasSelection('band') && exercise.equipment === 'band') return true
+    if (hasSelection('pull-up bar', 'pullup bar', 'pull up bar') && exercise.equipment === 'pull-up bar') return true
+    if (hasSelection('assisted pull-up machine', 'assisted pullup machine') && exercise.equipment === 'assisted pull-up machine') return true
+    if (hasSelection('assisted dip machine', 'dip machine') && exercise.equipment === 'assisted dip machine') return true
     if (hasSelection('rope', 'jump rope') && exercise.equipment === 'rope') return true
     if (hasSelection('stationary bike', 'bike') && exercise.equipment === 'stationary bike') return true
     if (hasSelection('elliptical machine', 'elliptical') && exercise.equipment === 'elliptical machine') return true

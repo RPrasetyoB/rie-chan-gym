@@ -7,7 +7,7 @@ export default function AuthLayout() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-block mb-4 animate-bounce-subtle">
-            <RieChanAvatar size={96} feature="auth" />
+            <RieChanAvatar size={144} feature="auth" />
           </div>
           <h1 className="font-display text-3xl font-bold text-primary mb-2">
             Rie-chan Cute PT

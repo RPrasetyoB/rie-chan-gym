@@ -17,14 +17,14 @@ export default function MainLayout() {
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Main Content */}
-      <main className="flex-1 min-h-0 overflow-y-auto pb-20">
+      <main className="flex-1 min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 safe-area-bottom">
-        <div className="max-w-lg mx-auto px-2">
-          <div className="flex items-center justify-around h-16">
+      <nav className="fixed inset-x-0 bottom-0 z-[60] block border-t border-border/80 bg-card/95 shadow-[0_-8px_24px_rgba(0,0,0,0.22)] backdrop-blur-lg safe-area-bottom">
+        <div className="w-full max-w-lg mx-auto px-2">
+          <div className="flex min-h-16 items-center justify-around">
             {navItems.map((item) => {
               const Icon = item.icon
               const isActive = location.pathname === item.path

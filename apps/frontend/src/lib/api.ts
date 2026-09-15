@@ -2,6 +2,7 @@ export type ApiUser = {
   id: string
   email: string
   name: string
+  role?: string
 }
 
 export type AuthTokens = {
@@ -67,7 +68,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
         : typeof payload === 'string' && payload
           ? payload
           : 'Request failed'
-    throw new Error(message)
+    const error = new Error(message) as Error & { status?: number }
+    error.status = response.status
+    throw error
   }
 
   return payload as T
@@ -187,4 +190,12 @@ export function apiPut<T>(path: string, body?: unknown, auth = true) {
     },
     { auth },
   )
+}
+
+export function apiPatch<T>(path: string, body?: unknown, auth = true) {
+  return apiRequest<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }, { auth })
+}
+
+export function apiDelete<T>(path: string, body?: unknown, auth = true) {
+  return apiRequest<T>(path, { method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) }, { auth })
 }

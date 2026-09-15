@@ -1,0 +1,26 @@
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, Bell } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
+
+type Notification = { id: string; title: string; message: string; readAt: string | null; createdAt: string; actionUrl: string | null }
+
+const configuredPollMinutes = Number(import.meta.env.VITE_NOTIFICATION_POLL_INTERVAL_MINUTES ?? '2')
+const notificationPollInterval = (Number.isFinite(configuredPollMinutes) ? Math.max(1, configuredPollMinutes) : 2) * 60_000
+
+export default function NotificationsPage() {
+  const navigate = useNavigate()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifyWorkout, setNotifyWorkout] = useState(() => localStorage.getItem('rie-chan-notify-workout') !== 'false')
+  const [notifyCoach, setNotifyCoach] = useState(() => localStorage.getItem('rie-chan-notify-coach') !== 'false')
+  const update = (key: string, value: boolean, setter: (value: boolean) => void) => { setter(value); localStorage.setItem(key, String(value)) }
+  const loadNotifications = useCallback(() => apiGet<{ notifications: Notification[]; unreadCount: number }>('/notifications').then((data) => { setNotifications(data.notifications); setUnreadCount(data.unreadCount) }).catch(() => undefined), [])
+  useEffect(() => { loadNotifications(); const interval = window.setInterval(loadNotifications, notificationPollInterval); return () => window.clearInterval(interval) }, [loadNotifications])
+  const markRead = async (notification: Notification) => { if (!notification.readAt) { await apiPatch(`/notifications/${notification.id}/read`); setNotifications((items) => items.map((item) => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item)); setUnreadCount((count) => Math.max(0, count - 1)) } if (notification.actionUrl) navigate(notification.actionUrl) }
+  const markAllRead = async () => { await apiPost('/notifications/read-all'); setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() }))); setUnreadCount(0) }
+
+  return <div className="p-4 max-w-lg mx-auto"><button onClick={() => navigate('/profile')} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-5"><ArrowLeft className="h-4 w-4" /> Back to profile</button><div className="flex items-start justify-between"><div><h1 className="font-display text-3xl font-bold">Notifications</h1><p className="text-muted-foreground mt-2">{unreadCount ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : 'You’re all caught up.'}</p></div><div className="rounded-full bg-primary/10 text-primary p-3"><Bell className="h-5 w-5" /></div></div><Card className="mt-6"><CardHeader className="flex-row items-center justify-between"><CardTitle>Recent</CardTitle>{unreadCount > 0 && <Button variant="ghost" size="sm" onClick={markAllRead}>Mark all as read</Button>}</CardHeader><CardContent className="space-y-3">{notifications.length === 0 ? <p className="text-sm text-muted-foreground py-5 text-center">No notifications yet.</p> : notifications.map((notification) => <button key={notification.id} onClick={() => markRead(notification)} className={`w-full text-left flex gap-3 rounded-xl p-3 transition-colors ${notification.readAt ? 'bg-secondary' : 'bg-primary/10 hover:bg-primary/15'}`}><div className="h-8 w-8 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center"><Bell className="h-4 w-4" /></div><div className="min-w-0"><p className="font-medium text-sm">{notification.title}{!notification.readAt && <span className="inline-block h-2 w-2 rounded-full bg-primary ml-2 align-middle" />}</p><p className="text-xs text-muted-foreground mt-1">{notification.message}</p><p className="text-[11px] text-muted-foreground mt-2">{new Date(notification.createdAt).toLocaleString()}</p></div></button>)}</CardContent></Card><Card className="mt-4"><CardHeader><CardTitle>Preferences</CardTitle></CardHeader><CardContent className="space-y-5"><label className="flex items-center justify-between gap-4 text-sm"><span><span className="font-medium block">Workout reminders</span><span className="text-xs text-muted-foreground">Get a nudge when it’s time to train.</span></span><input type="checkbox" checked={notifyWorkout} onChange={(e) => update('rie-chan-notify-workout', e.target.checked, setNotifyWorkout)} className="h-5 w-5 accent-primary" /></label><label className="flex items-center justify-between gap-4 text-sm"><span><span className="font-medium block">Coach encouragement</span><span className="text-xs text-muted-foreground">Receive helpful tips from Rie-chan.</span></span><input type="checkbox" checked={notifyCoach} onChange={(e) => update('rie-chan-notify-coach', e.target.checked, setNotifyCoach)} className="h-5 w-5 accent-primary" /></label></CardContent></Card><Button variant="secondary" className="w-full mt-5" onClick={() => navigate('/profile')}>Done</Button></div>
+}

@@ -62,6 +62,7 @@ async function loadPoseDetector() {
 interface CameraRepCounterProps {
   exerciseId?: string
   exerciseName?: string
+  resetKey?: string
   isWorkoutActive: boolean
   isTrackingEnabled?: boolean
   showControls?: boolean
@@ -73,6 +74,7 @@ interface CameraRepCounterProps {
 export function CameraRepCounter({
   exerciseId,
   exerciseName,
+  resetKey,
   isWorkoutActive,
   isTrackingEnabled = true,
   showControls = true,
@@ -152,7 +154,7 @@ export function CameraRepCounter({
           ? `Ready for your ${getCameraModeLabel(mode)} hold.`
           : `Ready for ${getCameraModeLabel(mode)} reps.`,
     )
-  }, [exerciseId, exerciseName, mode])
+  }, [exerciseId, exerciseName, mode, resetKey])
 
   useEffect(() => {
     if (!mode) return

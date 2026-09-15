@@ -5,8 +5,10 @@ import {
 } from '@/lib/onboardingStorage'
 
 export interface AuthSession {
+  id?: string
   name: string
   email: string
+  role?: string
   createdAt: string
 }
 

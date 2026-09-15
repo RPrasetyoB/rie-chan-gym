@@ -83,7 +83,7 @@ export default function OnboardingCompletePage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 flex flex-col items-center justify-center p-4 safe-area-top safe-area-bottom">
       <div className="w-full max-w-md text-center space-y-6">
         <div className="animate-bounce-subtle">
-          <RieChanAvatar size={128} feature="completion" />
+          <RieChanAvatar size={220} feature="completion" className="mx-auto" />
         </div>
 
         <div>

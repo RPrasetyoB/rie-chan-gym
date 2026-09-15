@@ -7,6 +7,7 @@ export interface AuthenticatedRequest extends Request {
     id: string
     email: string
     name: string
+    role: string
   }
 }
 
@@ -23,9 +24,19 @@ export function requireAuth(req: AuthenticatedRequest, _res: Response, next: Nex
       id: decoded.sub,
       email: decoded.email,
       name: decoded.name,
+      role: decoded.role ?? 'user',
     }
     next()
   } catch {
     next(new AppError(401, 'Invalid token'))
+  }
+}
+
+export function requireRole(role: string) {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
+    if (req.user?.role !== role) {
+      return next(new AppError(403, 'You do not have permission to access this area'))
+    }
+    next()
   }
 }

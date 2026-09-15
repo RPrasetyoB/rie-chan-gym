@@ -20,20 +20,20 @@ export type RieChanPose =
 const DEFAULT_ASSET = '/assets/rie-chibi-cheers.png'
 
 const FEATURE_ASSETS: Record<RieChanFeature, string> = {
-  auth: '/assets/rie-chibi-cheers.png',
-  onboarding: '/assets/rie-hallo.png',
+  auth: '/assets/welcome.png',
+  onboarding: '/assets/welcome.png',
   dashboard: '/assets/rie-chibi-cheers.png',
-  workout: '/assets/rie-chibi-cheers.png',
+  workout: '/assets/rie-celebrate.png',
   progress: '/assets/rie-show-progress.png',
-  profile: '/assets/rie-idle.png',
+  profile: '/assets/profile.png',
   coach: '/assets/rie-cheers.png',
-  completion: '/assets/rie-celebrate.png',
+  completion: '/assets/good-job.png',
 }
 
 const POSE_ASSETS: Record<RieChanPose, string> = {
   idle: '/assets/rie-idle.png',
   happy: '/assets/rie-chibi-cheers.png',
-  cheer: '/assets/rie-chibi-cheers.png',
+  cheer: '/assets/rie-cheers.png',
   point: '/assets/rie-show-progress.png',
   rest: '/assets/rie-rest.png',
   celebrate: '/assets/rie-celebrate.png',

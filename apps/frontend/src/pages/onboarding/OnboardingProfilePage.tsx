@@ -18,6 +18,9 @@ const EQUIPMENT_OPTIONS = [
   { value: 'barbell', label: 'Barbell' },
   { value: 'band', label: 'Band' },
   { value: 'cable', label: 'Cable' },
+  { value: 'pull-up bar', label: 'Pull-up bar' },
+  { value: 'assisted pull-up machine', label: 'Assisted pull-up machine' },
+  { value: 'assisted dip machine', label: 'Assisted dip machine' },
   { value: 'leg press machine', label: 'Leg press machine' },
   { value: 'cardio machine', label: 'Cardio machine' },
   { value: 'stationary bike', label: 'Stationary bike' },
@@ -126,10 +129,10 @@ export default function OnboardingProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 p-4 safe-area-top safe-area-bottom">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10 px-4 pt-8 pb-10">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-6">
-          <RieChanAvatar size={64} feature="onboarding" />
+          <RieChanAvatar size={64} pose="hallo" className="mx-auto" />
           <h1 className="font-display text-2xl font-bold mt-4">Tell me about yourself!</h1>
           <p className="text-muted-foreground text-sm">This helps me create your perfect plan</p>
         </div>
